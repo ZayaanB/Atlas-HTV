@@ -1,0 +1,26 @@
+{
+  "name": "@atlas/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12" },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./schemas/*.json": "./dist/schemas/*.json"
+  },
+  "files": ["dist", "examples", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/export-json.mjs",
+    "examples:generate": "node scripts/seed-examples.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "npm run build && node --test test/schemas.test.mjs",
+    "test:backend": "npm run build && node --import tsx --test test/backend.test.mjs"
+  },
+  "dependencies": { "json-schema-to-ts": "3.1.1" },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,792 @@
+{
+  "provenance": {
+    "kind": "curated_seed_projection",
+    "seed_path": "db/seeds/helene-asheville-2024/records.sql",
+    "seed_sha256": "aef0911522055a286a1075cf3e5a8e77d9695189d5aacca0cef61b36ddc89b1e",
+    "live": false
+  },
+  "articles": [
+    {
+      "id": "art-usgs-alert-2024-09-30",
+      "source_id": "src-usgs-alert-2024-09-30",
+      "title": "PROJECT ALERT NOTICE (GA NC SC) 09/30/2024 USGS SAWSC response to post-Hurricane Helene flooding",
+      "publisher": "U.S. Geological Survey, South Atlantic Water Science Center",
+      "url": "https://water.usgs.gov/alerts/item_2024-09-30_21:46:06.html",
+      "excerpt": null,
+      "published_at": "2024-10-01T01:46:06.000Z",
+      "published_date": null,
+      "publication_time_basis": "document_text",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:34.000Z",
+      "location_ids": [
+        "loc-usgs-03451500"
+      ],
+      "entity_ids": [
+        "ent-french-broad-river",
+        "ent-hurricane-helene-2024",
+        "ent-usgs"
+      ],
+      "themes": [
+        "flooding",
+        "river-monitoring"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "facility",
+      "content_hash": "78ebd4383593806aa174e3584f96ac0a2fd881ab6c31cd16cdda71cf18043b84"
+    },
+    {
+      "id": "art-usgs-news-helene-streamgages",
+      "source_id": "src-usgs-news-helene-streamgages",
+      "title": "USGS is collecting flood data and repairing streamgages damaged by Hurricane Helene",
+      "publisher": "U.S. Geological Survey",
+      "url": "https://www.usgs.gov/news/national-news-release/usgs-collecting-flood-data-and-repairing-streamgages-damaged-hurricane",
+      "excerpt": null,
+      "published_at": null,
+      "published_date": "2024-10-04",
+      "publication_time_basis": "date_only",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:36.000Z",
+      "location_ids": [
+        "loc-usgs-03451500"
+      ],
+      "entity_ids": [
+        "ent-french-broad-river",
+        "ent-hurricane-helene-2024",
+        "ent-usgs"
+      ],
+      "themes": [
+        "flooding",
+        "hurricanes",
+        "river-monitoring"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "facility",
+      "content_hash": "7728c4c8c368795739d50cba1aa272aab0e891fa930d59089960b0cee25ec72b"
+    },
+    {
+      "id": "art-nws-gsp-helene-flood-summary",
+      "source_id": "src-nws-gsp-helene-flood-summary",
+      "title": "Summary of 20240926-20240927 Flash Flood Event",
+      "publisher": "National Weather Service Greenville-Spartanburg",
+      "url": "https://www.weather.gov/gsp/20240926-20240927_flood_eventSum",
+      "excerpt": null,
+      "published_at": null,
+      "published_date": null,
+      "publication_time_basis": "unavailable",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:37.000Z",
+      "location_ids": [
+        "loc-buncombe-county-nc"
+      ],
+      "entity_ids": [
+        "ent-french-broad-river",
+        "ent-hurricane-helene-2024",
+        "ent-swannanoa-river"
+      ],
+      "themes": [
+        "flooding",
+        "hurricanes"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "region",
+      "content_hash": "8f333a64fd4d0e42453135d89bbfc731432df2e209866b44615d4dcfd30163ca"
+    },
+    {
+      "id": "art-nasa-eo-flash-floods-nc",
+      "source_id": "src-nasa-eo-flash-floods-nc",
+      "title": "Flash Floods Swamp North Carolina",
+      "publisher": "NASA Earth Observatory",
+      "url": "https://science.nasa.gov/earth/earth-observatory/flash-floods-swamp-north-carolina-153416/",
+      "excerpt": null,
+      "published_at": "2024-10-05T16:00:00.000Z",
+      "published_date": null,
+      "publication_time_basis": "page_metadata",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:37.000Z",
+      "location_ids": [
+        "loc-asheville-nc",
+        "loc-buncombe-county-nc"
+      ],
+      "entity_ids": [
+        "ent-french-broad-river",
+        "ent-hurricane-helene-2024",
+        "ent-swannanoa-river"
+      ],
+      "themes": [
+        "drinking-water",
+        "flooding",
+        "hurricanes"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "region",
+      "content_hash": "86a9bda3f9cb99e21aa03e5537e3c819d7f8c40c3c5fd5936f02537aabfc2bf1"
+    },
+    {
+      "id": "art-foxweather-rad-drone",
+      "source_id": "src-foxweather-rad-drone",
+      "title": "Drone video shows Asheville's River Arts District underwater during record-breaking flooding",
+      "publisher": "FOX Weather",
+      "url": "https://www.foxweather.com/extreme-weather/asheville-north-carolina-river-arts-district-flooding-drone",
+      "excerpt": null,
+      "published_at": "2024-09-30T19:25:55.000Z",
+      "published_date": null,
+      "publication_time_basis": "page_metadata",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:37.000Z",
+      "location_ids": [
+        "loc-asheville-nc"
+      ],
+      "entity_ids": [
+        "ent-french-broad-river",
+        "ent-hurricane-helene-2024"
+      ],
+      "themes": [
+        "flooding"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "city",
+      "content_hash": "caa7f8daa656b43fb0ab3b4d103b5a28e85588cdf1cbcb90c227f079f16ce529"
+    },
+    {
+      "id": "art-eenews-helene-flood-records",
+      "source_id": "src-eenews-helene-flood-records",
+      "title": "Helene broke century-old flood records across Southeast",
+      "publisher": "E&E News by POLITICO",
+      "url": "https://www.eenews.net/articles/helene-broke-century-old-flood-records-across-southeast/",
+      "excerpt": null,
+      "published_at": "2024-10-04T20:14:22.000Z",
+      "published_date": null,
+      "publication_time_basis": "page_metadata",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:38.000Z",
+      "location_ids": [
+        "loc-usgs-03451500"
+      ],
+      "entity_ids": [
+        "ent-french-broad-river",
+        "ent-hurricane-helene-2024",
+        "ent-usgs"
+      ],
+      "themes": [
+        "flooding",
+        "river-monitoring"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "facility",
+      "content_hash": "5561f48d08a371c85ab9f0adbb66c3d6eed80673313ec87085ac50c752a788c6"
+    },
+    {
+      "id": "art-wlos-first-water-flow",
+      "source_id": "src-wlos-first-water-flow",
+      "title": "Buncombe County sees first water flow since Hurricane Helene",
+      "publisher": "WLOS",
+      "url": "https://wlos.com/news/local/buncombe-county-sees-first-water-flow-since-hurricane-helene",
+      "excerpt": null,
+      "published_at": "2024-10-12T18:58:30.000Z",
+      "published_date": null,
+      "publication_time_basis": "page_metadata",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:38.000Z",
+      "location_ids": [
+        "loc-buncombe-county-nc"
+      ],
+      "entity_ids": [
+        "ent-asheville-water-resources",
+        "ent-hurricane-helene-2024"
+      ],
+      "themes": [
+        "drinking-water",
+        "infrastructure"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "region",
+      "content_hash": "82c3d807ba6757ff505a2f57cd2874bbfb6f54ce20fc9a8e6caa0be7dfe515b2"
+    },
+    {
+      "id": "art-wlos-boil-water-lifted",
+      "source_id": "src-wlos-boil-water-lifted",
+      "title": "Asheville's boil water notice has been lifted, water resources department says",
+      "publisher": "WLOS",
+      "url": "https://wlos.com/news/local/breaking-boil-water-advisory-has-been-lifted-water-resources-department-says",
+      "excerpt": null,
+      "published_at": "2024-11-18T16:43:49.000Z",
+      "published_date": null,
+      "publication_time_basis": "page_metadata",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:38.000Z",
+      "location_ids": [
+        "loc-asheville-nc"
+      ],
+      "entity_ids": [
+        "ent-asheville-water-resources",
+        "ent-hurricane-helene-2024"
+      ],
+      "themes": [
+        "drinking-water"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "city",
+      "content_hash": "dd8c31244aa0286b91438e588a6932efff22a531603767f1d2ed5e7857643cc7"
+    },
+    {
+      "id": "art-wbtv-boil-water-lifted",
+      "source_id": "src-wbtv-boil-water-lifted",
+      "title": "Asheville boil water advisory lifted nearly 2 months after Helene",
+      "publisher": "WBTV",
+      "url": "https://www.wbtv.com/2024/11/18/asheville-boil-water-advisory-lifted-nearly-2-months-after-helene/",
+      "excerpt": null,
+      "published_at": "2024-11-18T19:15:44.305Z",
+      "published_date": null,
+      "publication_time_basis": "page_metadata",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:38.000Z",
+      "location_ids": [
+        "loc-asheville-nc"
+      ],
+      "entity_ids": [
+        "ent-asheville-water-resources",
+        "ent-hurricane-helene-2024"
+      ],
+      "themes": [
+        "drinking-water"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "city",
+      "content_hash": "a353da18593dd1912b7108244a49b2b94a0dfe356ab2825fdc5696f27f3b1551"
+    },
+    {
+      "id": "art-wlos-council-recovery-2025",
+      "source_id": "src-wlos-council-recovery-2025",
+      "title": "Asheville City Council approves 10 Helene recovery items. Here's a breakdown",
+      "publisher": "WLOS",
+      "url": "https://wlos.com/news/local/asheville-city-council-approves-helene-recovery-items-breakdown-fema-hud-grants-water-system-north-fork-transmission-main-gashes-creek-bridge-four-boards-economy-housing-infrastructure",
+      "excerpt": null,
+      "published_at": "2025-08-27T22:14:26.000Z",
+      "published_date": null,
+      "publication_time_basis": "page_metadata",
+      "event_at": null,
+      "discovered_at": null,
+      "fetched_at": "2026-10-17T11:49:39.000Z",
+      "location_ids": [
+        "loc-asheville-nc"
+      ],
+      "entity_ids": [
+        "ent-asheville-water-resources",
+        "ent-hurricane-helene-2024"
+      ],
+      "themes": [
+        "drinking-water",
+        "infrastructure"
+      ],
+      "provider": "curated",
+      "provider_source_id": "curated-seed-helene-asheville-2024",
+      "verification_status": "reviewed",
+      "geographic_precision": "city",
+      "content_hash": "c4208138164cf0edee3dfbc81ddd7f7c75be7200f505b0a6e4ccb2ca6c6a3626"
+    }
+  ],
+  "locations": [
+    {
+      "id": "loc-usgs-03451500",
+      "name": "USGS 03451500 French Broad River at Asheville, NC",
+      "precision": "facility",
+      "coordinates": [
+        -82.5780556,
+        35.60888889
+      ],
+      "bounds": null,
+      "coordinates_basis": "usgs_site_file_nad83",
+      "bounds_basis": null,
+      "source_id": "src-usgs-site-file-asheville-gages",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "loc-usgs-03451000",
+      "name": "USGS 03451000 Swannanoa River at Biltmore, NC",
+      "precision": "facility",
+      "coordinates": [
+        -82.5447222,
+        35.5683333
+      ],
+      "bounds": null,
+      "coordinates_basis": "usgs_site_file_nad83",
+      "bounds_basis": null,
+      "source_id": "src-usgs-site-file-asheville-gages",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "loc-asheville-nc",
+      "name": "Asheville, North Carolina",
+      "precision": "city",
+      "coordinates": [
+        -82.5527255,
+        35.5709722
+      ],
+      "bounds": [
+        -82.67045,
+        35.41644,
+        -82.46038,
+        35.65612
+      ],
+      "coordinates_basis": "census_2020_internal_point",
+      "bounds_basis": "census_2020_place_boundary_extent",
+      "source_id": "src-census-2020-place-asheville",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "loc-buncombe-county-nc",
+      "name": "Buncombe County, North Carolina",
+      "precision": "region",
+      "coordinates": [
+        -82.5304234,
+        35.6093706
+      ],
+      "bounds": [
+        -82.88811,
+        35.41644,
+        -82.16904,
+        35.82411
+      ],
+      "coordinates_basis": "census_2020_internal_point",
+      "bounds_basis": "census_2020_county_boundary_extent",
+      "source_id": "src-census-2020-county-buncombe",
+      "verification_status": "reviewed"
+    }
+  ],
+  "sources": [
+    {
+      "id": "src-usgs-alert-2024-09-30",
+      "url": "https://water.usgs.gov/alerts/item_2024-09-30_21:46:06.html",
+      "title": "PROJECT ALERT NOTICE (GA NC SC) 09/30/2024 USGS SAWSC response to post-Hurricane Helene flooding",
+      "publisher": "U.S. Geological Survey, South Atlantic Water Science Center",
+      "source_type": "government_report",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": "2024-10-01T01:46:06.000Z",
+      "published_date": null,
+      "published_at_basis": "document_text",
+      "retrieved_at": "2026-10-17T11:49:34.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-news-helene-streamgages",
+      "url": "https://www.usgs.gov/news/national-news-release/usgs-collecting-flood-data-and-repairing-streamgages-damaged-hurricane",
+      "title": "USGS is collecting flood data and repairing streamgages damaged by Hurricane Helene",
+      "publisher": "U.S. Geological Survey",
+      "source_type": "government_report",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": "2024-10-04",
+      "published_at_basis": "date_only",
+      "retrieved_at": "2026-10-17T11:49:36.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-nws-gsp-helene-flood-summary",
+      "url": "https://www.weather.gov/gsp/20240926-20240927_flood_eventSum",
+      "title": "Summary of 20240926-20240927 Flash Flood Event",
+      "publisher": "National Weather Service Greenville-Spartanburg",
+      "source_type": "government_report",
+      "license": "Public domain (NWS web pages, unless noted otherwise)",
+      "license_url": "https://www.weather.gov/disclaimer",
+      "attribution": "NOAA National Weather Service",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:37.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-nasa-eo-flash-floods-nc",
+      "url": "https://science.nasa.gov/earth/earth-observatory/flash-floods-swamp-north-carolina-153416/",
+      "title": "Flash Floods Swamp North Carolina",
+      "publisher": "NASA Earth Observatory",
+      "source_type": "news_article",
+      "license": "NASA media usage guidelines (generally not subject to U.S. copyright; third-party material excepted)",
+      "license_url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "attribution": "NASA Earth Observatory",
+      "published_at": "2024-10-05T16:00:00.000Z",
+      "published_date": null,
+      "published_at_basis": "page_metadata",
+      "retrieved_at": "2026-10-17T11:49:37.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-foxweather-rad-drone",
+      "url": "https://www.foxweather.com/extreme-weather/asheville-north-carolina-river-arts-district-flooding-drone",
+      "title": "Drone video shows Asheville's River Arts District underwater during record-breaking flooding",
+      "publisher": "FOX Weather",
+      "source_type": "news_article",
+      "license": "Publisher copyright; link and title only",
+      "license_url": null,
+      "attribution": "FOX Weather",
+      "published_at": "2024-09-30T19:25:55.000Z",
+      "published_date": null,
+      "published_at_basis": "page_metadata",
+      "retrieved_at": "2026-10-17T11:49:37.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-eenews-helene-flood-records",
+      "url": "https://www.eenews.net/articles/helene-broke-century-old-flood-records-across-southeast/",
+      "title": "Helene broke century-old flood records across Southeast",
+      "publisher": "E&E News by POLITICO",
+      "source_type": "news_article",
+      "license": "Publisher copyright; link and title only",
+      "license_url": null,
+      "attribution": "E&E News by POLITICO",
+      "published_at": "2024-10-04T20:14:22.000Z",
+      "published_date": null,
+      "published_at_basis": "page_metadata",
+      "retrieved_at": "2026-10-17T11:49:38.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-wlos-first-water-flow",
+      "url": "https://wlos.com/news/local/buncombe-county-sees-first-water-flow-since-hurricane-helene",
+      "title": "Buncombe County sees first water flow since Hurricane Helene",
+      "publisher": "WLOS",
+      "source_type": "news_article",
+      "license": "Publisher copyright; link and title only",
+      "license_url": null,
+      "attribution": "WLOS",
+      "published_at": "2024-10-12T18:58:30.000Z",
+      "published_date": null,
+      "published_at_basis": "page_metadata",
+      "retrieved_at": "2026-10-17T11:49:38.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-wlos-boil-water-lifted",
+      "url": "https://wlos.com/news/local/breaking-boil-water-advisory-has-been-lifted-water-resources-department-says",
+      "title": "Asheville's boil water notice has been lifted, water resources department says",
+      "publisher": "WLOS",
+      "source_type": "news_article",
+      "license": "Publisher copyright; link and title only",
+      "license_url": null,
+      "attribution": "WLOS",
+      "published_at": "2024-11-18T16:43:49.000Z",
+      "published_date": null,
+      "published_at_basis": "page_metadata",
+      "retrieved_at": "2026-10-17T11:49:38.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-wbtv-boil-water-lifted",
+      "url": "https://www.wbtv.com/2024/11/18/asheville-boil-water-advisory-lifted-nearly-2-months-after-helene/",
+      "title": "Asheville boil water advisory lifted nearly 2 months after Helene",
+      "publisher": "WBTV",
+      "source_type": "news_article",
+      "license": "Publisher copyright; link and title only",
+      "license_url": null,
+      "attribution": "WBTV",
+      "published_at": "2024-11-18T19:15:44.305Z",
+      "published_date": null,
+      "published_at_basis": "page_metadata",
+      "retrieved_at": "2026-10-17T11:49:38.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-wlos-council-recovery-2025",
+      "url": "https://wlos.com/news/local/asheville-city-council-approves-helene-recovery-items-breakdown-fema-hud-grants-water-system-north-fork-transmission-main-gashes-creek-bridge-four-boards-economy-housing-infrastructure",
+      "title": "Asheville City Council approves 10 Helene recovery items. Here's a breakdown",
+      "publisher": "WLOS",
+      "source_type": "news_article",
+      "license": "Publisher copyright; link and title only",
+      "license_url": null,
+      "attribution": "WLOS",
+      "published_at": "2025-08-27T22:14:26.000Z",
+      "published_date": null,
+      "published_at_basis": "page_metadata",
+      "retrieved_at": "2026-10-17T11:49:39.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-page-03451500",
+      "url": "https://waterdata.usgs.gov/monitoring-location/USGS-03451500/",
+      "title": "USGS 03451500 French Broad River at Asheville, NC — monitoring location",
+      "publisher": "U.S. Geological Survey",
+      "source_type": "web_page",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:39.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-page-03451000",
+      "url": "https://waterdata.usgs.gov/monitoring-location/USGS-03451000/",
+      "title": "USGS 03451000 Swannanoa River at Biltmore, NC — monitoring location",
+      "publisher": "U.S. Geological Survey",
+      "source_type": "web_page",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:39.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-site-file-asheville-gages",
+      "url": "https://waterservices.usgs.gov/nwis/site/?format=rdb&sites=03451500,03451000&siteOutput=expanded",
+      "title": "USGS NWIS site file: 03451500 and 03451000 (expanded)",
+      "publisher": "U.S. Geological Survey, National Water Information System",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:39.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-iv-03451500-00060",
+      "url": "https://nwis.waterservices.usgs.gov/nwis/iv/?format=json&sites=03451500&parameterCd=00060&startDT=2024-09-20T00:00Z&endDT=2024-10-10T00:00Z",
+      "title": "USGS instantaneous values: 03451500 French Broad River at Asheville, NC, discharge (00060), 2024-09-20 to 2024-10-10 UTC",
+      "publisher": "U.S. Geological Survey, National Water Information System",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:46:34.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-iv-03451500-00065",
+      "url": "https://nwis.waterservices.usgs.gov/nwis/iv/?format=json&sites=03451500&parameterCd=00065&startDT=2024-09-20T00:00Z&endDT=2024-10-10T00:00Z",
+      "title": "USGS instantaneous values: 03451500 French Broad River at Asheville, NC, gage height (00065), 2024-09-20 to 2024-10-10 UTC",
+      "publisher": "U.S. Geological Survey, National Water Information System",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:46:34.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-iv-03451000-00060",
+      "url": "https://nwis.waterservices.usgs.gov/nwis/iv/?format=json&sites=03451000&parameterCd=00060&startDT=2024-09-20T00:00Z&endDT=2024-10-10T00:00Z",
+      "title": "USGS instantaneous values: 03451000 Swannanoa River at Biltmore, NC, discharge (00060), 2024-09-20 to 2024-10-10 UTC",
+      "publisher": "U.S. Geological Survey, National Water Information System",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:46:35.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-iv-03451000-00065",
+      "url": "https://nwis.waterservices.usgs.gov/nwis/iv/?format=json&sites=03451000&parameterCd=00065&startDT=2024-09-20T00:00Z&endDT=2024-10-10T00:00Z",
+      "title": "USGS instantaneous values: 03451000 Swannanoa River at Biltmore, NC, gage height (00065), 2024-09-20 to 2024-10-10 UTC",
+      "publisher": "U.S. Geological Survey, National Water Information System",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:46:35.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-usgs-peak-03451500",
+      "url": "https://nwis.waterdata.usgs.gov/nwis/peak?site_no=03451500&agency_cd=USGS&format=rdb",
+      "title": "USGS annual peak streamflow: 03451500 French Broad River at Asheville, NC",
+      "publisher": "U.S. Geological Survey, National Water Information System",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:46:36.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-census-2020-place-asheville",
+      "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/25/query?where=GEOID%3D%273702140%27&outFields=GEOID,NAME,INTPTLAT,INTPTLON&returnGeometry=true&outSR=4326&f=json",
+      "title": "Census 2020 TIGERweb incorporated place: Asheville city, NC (GEOID 3702140)",
+      "publisher": "U.S. Census Bureau",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain (federal government work)",
+      "license_url": null,
+      "attribution": "Source: U.S. Census Bureau",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:39.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-census-2020-county-buncombe",
+      "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/55/query?where=GEOID%3D%2737021%27&outFields=GEOID,NAME,INTPTLAT,INTPTLON&returnGeometry=true&outSR=4326&f=json",
+      "title": "Census 2020 TIGERweb county: Buncombe County, NC (GEOID 37021)",
+      "publisher": "U.S. Census Bureau",
+      "source_type": "dataset",
+      "license": "U.S. Public Domain (federal government work)",
+      "license_url": null,
+      "attribution": "Source: U.S. Census Bureau",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:40.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-hls-l30-granule-2024-08-30",
+      "url": "https://cmr.earthdata.nasa.gov/search/concepts/G3222264591-LPCLOUD.umm_json",
+      "title": "HLS.L30.T17SLV.2024243T160534.v2.0 (Landsat 8 OLI, 2024-08-30)",
+      "publisher": "NASA LP DAAC",
+      "source_type": "imagery",
+      "license": "CC0 (EOSDIS data use guidance; no restrictions, citation requested)",
+      "license_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance",
+      "attribution": "NASA LP DAAC HLS L30 v2.0 (doi:10.5067/HLS/HLSL30.002), imagery via NASA GIBS",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:40.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-hls-l30-granule-2024-10-09",
+      "url": "https://cmr.earthdata.nasa.gov/search/concepts/G3263842231-LPCLOUD.umm_json",
+      "title": "HLS.L30.T17SLV.2024283T160541.v2.0 (Landsat 9 OLI, 2024-10-09)",
+      "publisher": "NASA LP DAAC",
+      "source_type": "imagery",
+      "license": "CC0 (EOSDIS data use guidance; no restrictions, citation requested)",
+      "license_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance",
+      "attribution": "NASA LP DAAC HLS L30 v2.0 (doi:10.5067/HLS/HLSL30.002), imagery via NASA GIBS",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:40.000Z",
+      "verification_status": "reviewed"
+    },
+    {
+      "id": "src-hls-l30-v2-dataset",
+      "url": "https://www.earthdata.nasa.gov/data/catalog/lpcloud-hlsl30-2.0",
+      "title": "HLS Operational Land Imager Surface Reflectance and TOA Brightness Daily Global 30m v2.0",
+      "publisher": "NASA LP DAAC",
+      "source_type": "dataset",
+      "license": "CC0 (EOSDIS data use guidance; no restrictions, citation requested)",
+      "license_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance",
+      "attribution": "Neigh, C., et al. (2021). HLS Operational Land Imager Surface Reflectance and TOA Brightness Daily Global 30m v2.0. NASA LP DAAC. doi:10.5067/HLS/HLSL30.002",
+      "published_at": null,
+      "published_date": null,
+      "published_at_basis": "unavailable",
+      "retrieved_at": "2026-10-17T11:49:41.000Z",
+      "verification_status": "reviewed"
+    }
+  ],
+  "citations": [
+    {
+      "source_id": "src-usgs-alert-2024-09-30",
+      "record_id": "art-usgs-alert-2024-09-30",
+      "url": "https://water.usgs.gov/alerts/item_2024-09-30_21:46:06.html",
+      "title": "PROJECT ALERT NOTICE (GA NC SC) 09/30/2024 USGS SAWSC response to post-Hurricane Helene flooding"
+    },
+    {
+      "source_id": "src-usgs-news-helene-streamgages",
+      "record_id": "art-usgs-news-helene-streamgages",
+      "url": "https://www.usgs.gov/news/national-news-release/usgs-collecting-flood-data-and-repairing-streamgages-damaged-hurricane",
+      "title": "USGS is collecting flood data and repairing streamgages damaged by Hurricane Helene"
+    },
+    {
+      "source_id": "src-nws-gsp-helene-flood-summary",
+      "record_id": "art-nws-gsp-helene-flood-summary",
+      "url": "https://www.weather.gov/gsp/20240926-20240927_flood_eventSum",
+      "title": "Summary of 20240926-20240927 Flash Flood Event"
+    },
+    {
+      "source_id": "src-nasa-eo-flash-floods-nc",
+      "record_id": "art-nasa-eo-flash-floods-nc",
+      "url": "https://science.nasa.gov/earth/earth-observatory/flash-floods-swamp-north-carolina-153416/",
+      "title": "Flash Floods Swamp North Carolina"
+    },
+    {
+      "source_id": "src-foxweather-rad-drone",
+      "record_id": "art-foxweather-rad-drone",
+      "url": "https://www.foxweather.com/extreme-weather/asheville-north-carolina-river-arts-district-flooding-drone",
+      "title": "Drone video shows Asheville's River Arts District underwater during record-breaking flooding"
+    },
+    {
+      "source_id": "src-eenews-helene-flood-records",
+      "record_id": "art-eenews-helene-flood-records",
+      "url": "https://www.eenews.net/articles/helene-broke-century-old-flood-records-across-southeast/",
+      "title": "Helene broke century-old flood records across Southeast"
+    },
+    {
+      "source_id": "src-wlos-first-water-flow",
+      "record_id": "art-wlos-first-water-flow",
+      "url": "https://wlos.com/news/local/buncombe-county-sees-first-water-flow-since-hurricane-helene",
+      "title": "Buncombe County sees first water flow since Hurricane Helene"
+    },
+    {
+      "source_id": "src-wlos-boil-water-lifted",
+      "record_id": "art-wlos-boil-water-lifted",
+      "url": "https://wlos.com/news/local/breaking-boil-water-advisory-has-been-lifted-water-resources-department-says",
+      "title": "Asheville's boil water notice has been lifted, water resources department says"
+    },
+    {
+      "source_id": "src-wbtv-boil-water-lifted",
+      "record_id": "art-wbtv-boil-water-lifted",
+      "url": "https://www.wbtv.com/2024/11/18/asheville-boil-water-advisory-lifted-nearly-2-months-after-helene/",
+      "title": "Asheville boil water advisory lifted nearly 2 months after Helene"
+    },
+    {
+      "source_id": "src-wlos-council-recovery-2025",
+      "record_id": "art-wlos-council-recovery-2025",
+      "url": "https://wlos.com/news/local/asheville-city-council-approves-helene-recovery-items-breakdown-fema-hud-grants-water-system-north-fork-transmission-main-gashes-creek-bridge-four-boards-economy-housing-infrastructure",
+      "title": "Asheville City Council approves 10 Helene recovery items. Here's a breakdown"
+    }
+  ]
+}
