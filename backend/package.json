@@ -10,6 +10,7 @@
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "check": "node --env-file-if-exists=.env --import tsx src/check.ts",
+    "verify:connections": "node --env-file-if-exists=.env --import tsx src/verify-connections.ts",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "node --import tsx --test test/*.test.ts",

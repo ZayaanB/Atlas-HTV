@@ -18,10 +18,13 @@ npm --prefix backend run dev
 
 The server defaults to `127.0.0.1:3001`. Set `HOST=0.0.0.0` only when the deployment owner needs it. Local `.env` loading is relative to the backend package working directory. Never place secrets in frontend settings.
 
+For clear credential setup steps, see [Tiger Cloud and Gemini setup](docs/credentials-setup.md). `backend/.env` is the local secret file; `.env.local` is not loaded by these scripts. Leave optional credential settings commented until you fill them in. The example contains no usable secrets.
+
 ```bash
 npm --prefix backend run typecheck
 npm --prefix backend test
 npm --prefix backend run check
+npm --prefix backend run verify:connections
 npm --prefix backend run build
 npm --prefix backend start
 ```
@@ -29,6 +32,8 @@ npm --prefix backend start
 `app.ts` composes without listening. `server.ts` owns listening, SIGINT/SIGTERM, connection draining and shutdown; closing the app cancels pending work and closes its owned pool. `REQUEST_TIMEOUT_MS` defaults to 30 seconds for the entire route lifecycle; expiry returns a structured 503 `REQUEST_TIMEOUT`. Disconnect/shutdown cancellation prevents late work from returning actions. Assistant generation also has bounded concurrency, tool calls, rounds, context, and output. Rate limiting returns 429 `RATE_LIMIT` with Retry-After. Logs exclude raw errors, bodies, prompts, and credentials. Bindings are local and CORS is not enabled: the intended integration is Caddy serving frontend and `/api` on the same origin. The rate limiter uses the socket IP (`trustProxy=false`), so a reverse proxy shares that budget; Person 4/Person 3 must agree trusted proxy topology before changing it.
 
 `npm --prefix backend run check` validates environment and handoff exports locally, lists missing shared schemas/core query plans, and reports whether credentials are configured. It opens no database connection and calls no provider. Exit codes: 0 means data configuration is complete, 2 means required setup is missing, and 1 means configuration is invalid. Configured means available for a later live check, not verified access. Blank/whitespace settings, inconsistent embedding configuration, malformed query plans, duplicate source/region IDs, missing modules and modules outside their owned paths fail with safe diagnostics. Integration modules must be portable `.mjs` or built `.js` files.
+
+`verify:connections` is a separate explicit read-only network check that works without teammate schemas: it verifies PostgreSQL session TLS and reads installed extension names, and fetches Gemini model metadata. Use `-- --database` or `-- --gemini` to select one check. It does not apply migrations, import records, generate embeddings, or generate answers. Success verifies the selected connection/metadata only, not the Atlas schema, generation quota, tool calling, or grounded answers. Its exit codes are 0 (selected probes passed), 2 (missing configuration), and 1 (invalid configuration/failed probe). Raw errors and credential values are never printed.
 
 ## What is implemented
 
@@ -96,7 +101,7 @@ Indexing reads an explicitly permitted stored chunk, compares hash/model/version
 
 ## Validation and remaining integration work
 
-Verified in this checkout: **52 behavioral tests passed**, including rate-limit/deadline regressions, cancellation of late model responses, stalled-provider shutdown, malformed provider/handoff rejection, and a separate server process that serves liveness and exits cleanly on SIGTERM. TypeScript checks passed for source/tests, the production build passed, and the local configuration checker accurately reports incomplete setup with exit code 2. Earlier built-server smoke checks returned liveness 200, readiness 503 and a structured missing-contract 503 for news. `git diff --check` passed; changes remain within `backend/`.
+Verified in this checkout: **60 behavioral tests passed**, including rate-limit/deadline regressions, cancellation of late model responses, stalled-provider shutdown, malformed provider/handoff rejection, and a separate server process that serves liveness and exits cleanly on SIGTERM. TypeScript checks passed for source/tests, the production build passed, and the local configuration checker and read-only connection checker accurately report incomplete setup with exit code 2. Connection-check tests cover TLS/extension reporting, metadata-only Gemini probing, timeouts, cleanup and redacted diagnostics using injected clients; no live credentials have been verified. Earlier built-server smoke checks returned liveness 200, readiness 503 and a structured missing-contract 503 for news. `git diff --check` passed; changes remain within `backend/`.
 
 Tests cover manual/tool filter parity, timestamp/bounds handling, validation, citation/source relationships, UI-action rejection, timeout/cancellation, tool limits, redaction, parameter binding/transaction rollback, embedding identity/fallback, import normalization/deduplication/permissions/failures, provider payloads and size limits, and flight cache/coalescing/backoff/expiry. They use synthetic dependencies plus a temporary localhost server, and do not contact external providers. A failed rollback discards the affected pool client while preserving the original write error.
 
