@@ -17,7 +17,6 @@ export async function buildApp(config: Config, injected?: Services) {
   const app = Fastify({
     logger: config.nodeEnv !== 'test' ? { level:'info', redact:['req.headers.authorization','req.headers.cookie','req.body','res.headers.set-cookie'] } : false,
     logController:new LogController({disableRequestLogging:true}), bodyLimit:32768, requestTimeout:30000, connectionTimeout:10000,
-    handlerTimeout:config.requestTimeoutMs,
     forceCloseConnections:'idle', trustProxy:false
   });
   await app.register(rateLimit, { max:config.rateMax,timeWindow:'1 minute',
@@ -27,10 +26,23 @@ export async function buildApp(config: Config, injected?: Services) {
   app.addHook('onRequest', async (request,reply) => {
     const controller = new AbortController();
     controllers.add(controller);
-    request.atlasSignal = AbortSignal.any([controller.signal,request.signal]);
-    const abort = () => { controllers.delete(controller); if (!reply.raw.writableEnded) controller.abort(); };
+    // Fastify 5.12's request.signal/handlerTimeout abort on IncomingMessage.close,
+    // which also fires after a complete POST body. Track actual disconnects and
+    // the whole lifecycle deadline ourselves so valid JSON posts remain usable.
+    request.atlasSignal = controller.signal;
+    const deadline=setTimeout(()=>{
+      if (reply.sent || reply.raw.destroyed) return;
+      const error=new AppError('REQUEST_TIMEOUT','Request processing timed out',503,true);
+      controller.abort(error);
+      reply.send(error);
+    },config.requestTimeoutMs).unref();
+    const cleanup=()=>{
+      clearTimeout(deadline);controllers.delete(controller);
+      request.raw.off('aborted',abort);reply.raw.off('close',abort);reply.raw.off('finish',cleanup);
+    };
+    const abort = () => {cleanup();if (!reply.raw.writableEnded) controller.abort();};
     request.raw.once('aborted',abort); reply.raw.once('close',abort);
-    reply.raw.once('finish',() => { controllers.delete(controller); request.raw.off('aborted',abort); reply.raw.off('close',abort); });
+    reply.raw.once('finish',cleanup);
   });
   app.addHook('onRoute',route => {
     const handler = route.handler;
@@ -43,6 +55,7 @@ export async function buildApp(config: Config, injected?: Services) {
     };
   });
   app.setErrorHandler((error,request,reply) => {
+    if (reply.sent) return;
     const mapped = (error as {code?:string}).code === 'FST_ERR_HANDLER_TIMEOUT'
       ? new AppError('REQUEST_TIMEOUT','Request processing timed out',503,true) : error;
     const known = mapped instanceof AppError;
