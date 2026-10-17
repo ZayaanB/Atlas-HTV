@@ -1,2 +1,5 @@
-// Scaffold only; no implementation.
-// GET /api/investigations/:id: resolve a source-linked brief and its evidence using agreed IDs/schema. Distinguish missing investigations from ordinary articles without a prepared brief.
+import type { FastifyInstance } from 'fastify';
+import type { Services } from '../runtime/services.js';
+export function investigationsRoutes(app: FastifyInstance, services: Services) {
+  app.get('/api/investigations/:id', request => services.retrieval.investigation(request.params,request.atlasSignal));
+}
