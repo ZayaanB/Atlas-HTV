@@ -13,14 +13,28 @@ function plain(value: unknown, max: number): string {
   if (value && typeof value === 'object' && !Array.isArray(value)) value = object(value)['#text'];
   return string(value).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,max);
 }
+export function repairNasaNamespaceSpacing(xml: string, url: URL): {xml: string;repaired: boolean} {
+  // Observed 2026-10-17 on the reviewed NASA feed. Correct only this missing
+  // delimiter in the root header; never repair article text or tolerate other bad XML.
+  if (url.hostname!=='science.nasa.gov' || url.pathname!=='/feed/') return {xml,repaired:false};
+  const start=xml.indexOf('<rss '),end=start<0?-1:xml.indexOf('>',start);
+  if (start<0 || start>512 || end<0 || end>4096) return {xml,repaired:false};
+  const header=xml.slice(start,end);
+  const malformed='xmlns:apod="https://science.nasa.gov/apod/"xmlns:media="http://search.yahoo.com/mrss/"';
+  if (!header.includes(malformed)) return {xml,repaired:false};
+  const repaired=header.replace(malformed,malformed.replace('"xmlns:media','" xmlns:media'));
+  return {xml:xml.slice(0,start)+repaired+xml.slice(end),repaired:true};
+}
 export class Rss {
   constructor(private timeoutMs: number, private fetcher: Fetch = fetch) {}
   async fetch(definition: Data, signal?: AbortSignal): Promise<Data[]> {
     if (definition.permitted !== true || !string(definition.license_url)) throw new AppError('SOURCE_NOT_PERMITTED','RSS feed requires recorded permission and license/terms reference');
     if (definition.excerpts_permitted === true && (!Number.isInteger(definition.max_excerpt_chars) || Number(definition.max_excerpt_chars) < 1 || Number(definition.max_excerpt_chars) > 500))
       throw new AppError('SOURCE_DEFINITION_INVALID','Permitted RSS excerpts require a character bound of 1–500');
-    const xml = await fetchText(this.fetcher,feedUrl(definition.url), {redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(this.timeoutMs),...(signal ? [signal] : [])])},1000000);
-    if (/<!DOCTYPE|<!ENTITY/i.test(xml)) throw new AppError('INVALID_XML','XML entities and document types are rejected',502);
+    const url=feedUrl(definition.url);
+    const received = await fetchText(this.fetcher,url, {redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(this.timeoutMs),...(signal ? [signal] : [])])},1000000);
+    if (/<!DOCTYPE|<!ENTITY/i.test(received)) throw new AppError('INVALID_XML','XML entities and document types are rejected',502);
+    const {xml}=repairNasaNamespaceSpacing(received,new URL(url));
     if (XMLValidator.validate(xml) !== true) throw new AppError('INVALID_XML','Provider returned malformed XML',502);
     const document = object(new XMLParser({ignoreAttributes:false,processEntities:false,parseTagValue:false,removeNSPrefix:true}).parse(xml));
     let items: Data[];

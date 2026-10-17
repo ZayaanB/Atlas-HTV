@@ -50,6 +50,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     flightsExpireMs: integer('FLIGHTS_CACHE_TTL_MS', 300000, 1000, 3600000),
     flightsMaxRegions: integer('FLIGHTS_MAX_ACTIVE_REGIONS', 3, 1, 10),
     providerTimeoutMs: integer('PROVIDER_TIMEOUT_MS', 8000, 100, 30000),
+    ingestionProviderTimeoutMs: integer('INGESTION_PROVIDER_TIMEOUT_MS',30000,100,30000),
     rateMax: integer('RATE_LIMIT_MAX', 120, 1, 1000),
     aiConcurrency: integer('AI_MAX_CONCURRENT', 2, 1, 8),
     requestTimeoutMs: integer('REQUEST_TIMEOUT_MS',30000,100,60000)

@@ -13,7 +13,7 @@ async function main() {
     const sourceModule = await loadLocalModule(config.sourceDefinitionsModule,['scripts/source-definitions']);
     const sourceId = process.argv[2];
     if (!sourceId || process.argv.length!==3) throw new AppError('INVALID_ARGUMENT','Provide exactly one reviewed source ID');
-    const ingestion = new Ingestion(services.contracts,services.repository,records(sourceModule?.sources),new Gdelt(config.providerTimeoutMs),new Rss(config.providerTimeoutMs));
+    const ingestion = new Ingestion(services.contracts,services.repository,records(sourceModule?.sources),new Gdelt(config.ingestionProviderTimeoutMs),new Rss(config.ingestionProviderTimeoutMs));
     const result = await ingestion.refresh(sourceId,AbortSignal.timeout(60000));
     console.log(JSON.stringify(result));
   } finally { await services.repository.close(); }

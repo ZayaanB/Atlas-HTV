@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Ingestion, normalizeArticle, canonicalUrl } from '../src/data/ingestion.js';
 import { Gdelt, gdeltDate } from '../src/data/providers/gdelt.js';
-import { Rss } from '../src/data/providers/rss.js';
+import { Rss, repairNasaNamespaceSpacing } from '../src/data/providers/rss.js';
 import { readResponse } from '../src/data/providers/http.js';
 import { TestRepository, testContracts } from './support.js';
 const definition = {id:'test-provider',provider:'gdelt',query:'test',permitted:true,license_url:'https://example.invalid/terms',excerpts_permitted:false};
@@ -76,4 +76,26 @@ test('body cleanup errors do not mask provider status or size failures',async ()
 });
 test('a stalled provider cannot ignore the configured request deadline', {timeout:2000},async () => {
   await assert.rejects(new Gdelt(100,async () => new Promise(() => {})).fetch(definition),/cancelled/);
+});
+test('the observed NASA root namespace typo is repaired without changing article text, links or dates',async () => {
+  const malformed='<rss version="2.0" xmlns:apod="https://science.nasa.gov/apod/"xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>Synthetic NASA protocol headline</title><link>https://science.nasa.gov/synthetic</link><pubDate>Thu, 01 Jan 2026 12:00:00 GMT</pubDate><description>Synthetic permitted excerpt</description></item></channel></rss>';
+  const nasa={...definition,provider:'rss',url:'https://science.nasa.gov/feed/?science_org=19791%2C22453',publisher:'NASA',excerpts_permitted:true,max_excerpt_chars:300};
+  const repaired=repairNasaNamespaceSpacing(malformed,new URL(String(nasa.url)));
+  assert.equal(repaired.repaired,true);
+  assert.equal(repaired.xml,malformed.replace('"xmlns:media','" xmlns:media'));
+  const [article]=await new Rss(1000,async () => new Response(malformed)).fetch(nasa);
+  assert.equal(article!.title,'Synthetic NASA protocol headline');
+  assert.equal(article!.url,'https://science.nasa.gov/synthetic');
+  assert.equal(article!.published_at,'2026-01-01T12:00:00.000Z');
+  assert.equal(article!.excerpt,'Synthetic permitted excerpt');
+  assert.equal(repairNasaNamespaceSpacing(repaired.xml,new URL(String(nasa.url))).repaired,false);
+  await assert.rejects(new Rss(1000,async () => new Response(malformed)).fetch({...nasa,url:'https://example.org/feed'}),/malformed XML/);
+  await assert.rejects(new Rss(1000,async () => new Response(malformed.replace('</item>',''))).fetch(nasa),/malformed XML/);
+});
+test('NASA root repair leaves body text and other XML errors untouched and still rejects entities',async () => {
+  const nasa={...definition,provider:'rss',url:'https://science.nasa.gov/feed/'};
+  const body='<rss><channel><description><![CDATA[xmlns:apod="https://science.nasa.gov/apod/"xmlns:media="http://search.yahoo.com/mrss/"]]></description></channel></rss>';
+  assert.deepEqual(repairNasaNamespaceSpacing(body,new URL(String(nasa.url))),{xml:body,repaired:false});
+  await assert.rejects(new Rss(1000,async () => new Response('<!DOCTYPE rss [<!ENTITY e "unsafe">]>'+body)).fetch(nasa),/entities/);
+  await assert.rejects(new Rss(1000,async () => new Response('<rss bad="attribute"joined="attribute"><channel/></rss>')).fetch(nasa),/malformed XML/);
 });
