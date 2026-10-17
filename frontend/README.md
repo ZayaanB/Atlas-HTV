@@ -1,40 +1,37 @@
-# Frontend foundation — Persons 1 and 2
+# Atlas frontend
 
-React/TypeScript/Vite, Zustand, TanStack Query, native fetch, and shared JSON Schema/Ajv validation. TanStack Router is deliberately deferred. Mapbox GL JS is installed for Person 2; no map instance or provider access is implemented by this slice.
+A full-screen dark Mapbox workspace with on-demand panels. The design follows the approved Night Earth · Dark reference using dark cartography instead of night imagery. Search and News are the two dock actions; all content uses one floating panel or a responsive bottom sheet.
 
-## Start from the repository root
+## Run locally
 
-Requires Node >=22.12 and npm. Build contracts before frontend consumers:
+Requires Node >=22.12 and npm. From the repository root:
 
-```bash
+```sh
 npm --prefix contracts ci
 npm --prefix contracts run build
 npm --prefix frontend ci
 npm --prefix frontend run dev:fixture
 ```
 
-Open the local URL printed by Vite (normally `http://127.0.0.1:5173`). Fixture mode is explicitly selected and always labeled. It uses the committed 2024 Helene records, never fetches current news, and needs no credentials or backend. The temporary map preview lists sourced locations; development-only buttons exercise area/coordinate events without claiming geographic rendering.
+Fixture mode is explicitly labeled and works without a backend or AI credentials. It uses the committed Helene articles, source-linked investigation, dated imagery and 7,467 archived observations. The globe needs a restricted public `VITE_MAPBOX_ACCESS_TOKEN`; without it, the map has an explicit unavailable state and the reporting/research panels remain usable. No automatic fallback from API mode to fixture mode occurs.
 
-For the actual backend, run `npm --prefix frontend run dev` and start Person 3's backend separately on `127.0.0.1:3001` using its README. `/api` is proxied locally and remains same-origin in production. The default data mode is `api`; `.env.local` may explicitly set `VITE_DATA_MODE=api|fixture`. The fixture launch command overrides that setting. There is no automatic failure fallback and no configurable arbitrary API origin.
+For the backend, use `npm --prefix frontend run dev` and start Person 3's backend independently on port 3001. Same-origin `/api` is proxied locally. See [research integration handoff](docs/research-handoff.md) for the existing assistant/research endpoint contracts and exact remaining service setup. Optional catalog discovery does not gate assistant or timeline access.
 
-Only a future restricted public Mapbox token belongs in `VITE_MAPBOX_ACCESS_TOKEN`. Never place Gemini/database credentials in Vite configuration. All `VITE_` settings are public build inputs.
+## Implemented experience
 
-## State and data ownership
+- Centered globe/home framing, map/satellite/auto preferences, sourced markers/extents and geographic selection; one Mapbox instance.
+- Search, known-place suggestions, topics/entities/publication filters, news pagination and article metadata/provenance.
+- One-panel Back/Close navigation, retained search drafts and scroll positions, Cmd/Ctrl+K, Escape and responsive sheet controls.
+- Investigation GET integration, known-ID access, sources/local saved IDs, paged raw timeline GET integration with units/precision/nulls, chart gaps/table alternatives, and verified dated imagery overlays.
+- Assistant POST integration with explicit action consent, validated citations, coverage/fallback diagnostics, audience emphasis, cancellation and stale-request rejection. Fixture mode never generates an AI answer.
+- Bounded aircraft layer/details with heading/unknown states, timestamps, expiry, visibility-aware polling and provider backoff.
+- Persistent historical/coverage labels, missing data and recoverable error states, reduced motion and keyboard affordances.
 
-- `src/app/state.ts`: canonical filters, selection IDs, viewport snapshots, basemap preference, inspected coordinates, and acknowledged camera commands. No fetched records or query loading flags. Nothing is persisted yet; saved collections are deferred.
-- `src/lib/api.ts`: shared-schema validation, comma-separated GET array/bounds serialization, numeric pagination, structured errors, and fetch cancellation.
-- `src/lib/queries.ts`: shared query keys/options and location batching. News defaults to 50 items; both map and feed consume that same page. Filter changes reset pagination/selection. New query keys show loading instead of stale results from a different filter.
-- `src/app/map-interface.ts`: Person 2's frontend-only props/events. Domain records come exclusively from `@atlas/contracts`.
+Zustand owns browser state and IDs; TanStack Query owns server records. Domain schemas/types live only under `contracts/`. Public Vite inputs must never contain Gemini/database credentials.
 
-Query freshness defaults to 30 seconds with no window-focus refetch. Transient GET failures retry once; invalid payloads/ordinary client errors do not. Successful cached records may remain during a failed refresh, with an explicit notice. Location IDs are resolved in batches of 100 and paged until resolved or empty, within the existing offset limit. Unresolved IDs remain visible as limitations. Empty ID sets never issue an unrestricted location query.
+## Verify
 
-Panning publishes a viewport only. **Search this area** applies bounds while preserving other filters. This slice supports ordered bounds within longitude/latitude ranges; antimeridian-spanning searches are disabled. Return to globe changes only the camera. Broad locations use sourced bounds; precise locations may use sourced coordinates.
-
-Pagination has no matching total or fabricated end detection. Next remains available until an empty page or the backend offset cap; a short page does not prove completeness. Stored-corpus counts are labeled separately. Coverage and timestamps retain their original meaning.
-
-## Checks
-
-```bash
+```sh
 npm --prefix frontend run build
 npm --prefix frontend test
 npm --prefix contracts run typecheck
@@ -42,10 +39,4 @@ npm --prefix contracts test
 npm --prefix contracts run test:backend
 ```
 
-An explicit fixture production build is available with `npm --prefix frontend run build -- --mode fixture`; it remains labeled. Ordinary builds use API mode unless explicitly configured otherwise.
-
-## Remaining handoffs
-
-Person 2 starts with [the map interface guide](docs/map-handoff.md). Map, satellite transitions, flights, imagery, assistant/actions, full investigations, timeline, saves, URL navigation, and deployment are not implemented here. Feature placeholders in their owned directories remain untouched.
-
-News/location schemas now match the backend protocol, but 16 of its 24 required domain schemas remain missing. Overall backend readiness still fails until its remaining contracts and external setup are supplied. No live database/provider integration is claimed by the frontend tests.
+An explicit historical production build is `npm --prefix frontend run build -- --mode fixture`. Ordinary builds default to API mode. Mapbox is lazily loaded; its geographic renderer accounts for the large vendor chunk. Existing provider/data setup and backend feature handoffs remain external dependencies; UI presence is not proof of a live integration.

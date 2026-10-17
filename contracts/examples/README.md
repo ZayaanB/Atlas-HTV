@@ -21,3 +21,7 @@ npm --prefix contracts test
 The generator reads literal seed records and projects the existing article/source/location fields. It does not execute SQL, import data, connect to a database, or fetch URLs; unsupported seed expressions fail rather than being evaluated. Tests compare the committed examples against this projection to catch drift.
 
 The synthetic provider inputs and malformed cases in `contracts/test/` are protocol tests only. No synthetic content is added to this shared historical fixture. `helene-api.json` adds shared news/location success and empty-news envelopes, deterministically derived by `scripts/api-examples.mjs` from these same core records. Its coverage is explicitly `fixture`/`live:false`, has no fabricated feed refresh or observation-series metadata, and labels counts as corpus counts. Regeneration also updates these envelopes. Error envelopes are exercised as synthetic protocol tests; assistant/fallback envelopes remain deferred.
+
+## Historical research projection
+
+`helene-research.json` contains the resolved Helene investigation, reviewed option labels, explicit article associations, verified evidence metadata, and all 7,467 archived observation rows. `node contracts/scripts/research-examples.mjs` regenerates it offline from the literal seed rows and CSV. It performs no SQL execution, database imports, or provider requests. Fixture assistant capability is false and fixture flight regions are empty.

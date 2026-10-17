@@ -1,10 +1,10 @@
 # Person 2 — Map and visuals
 
-Read root `AGENTS.md` and `atlas_prd.md`. Current phase is scaffold/docs only; implementation needs a later explicit start instruction.
+Read root `AGENTS.md` and `atlas_prd.md`. The approved frontend implementation plan now authorizes dark cartography, responsive globe framing, sourced location layers, evidence and bounded aircraft rendering.
 
 ## First step
 
-Until implementation is explicitly authorized, review the existing map scaffold and shared contracts, then list the map inputs and events needed from Persons 1, 3, and 4. Once authorized, begin by confirming those interfaces before implementing the map feature.
+Use the agreed map interface and preserve the root no-provider-call/no-deployment boundaries. Keep map/data validation and external setup claims distinct.
 
 Own `frontend/src/features/map/`. Implement Mapbox GL JS as the sole geographic renderer with an original Atlas style, globe/local zoom, clusters, boundaries, source-backed pins, satellite labels/toggle, evidence overlays, and aircraft symbols. Review any 21st.dev source/license before reuse; it is inspiration, not a second renderer.
 

@@ -1,32 +1,131 @@
 // Compile-time checks only. @ts-expect-error must fail if a contract becomes too permissive.
-import { schemas } from '../index.js';
-import { Ajv } from 'ajv';
-import addFormats from 'ajv-formats';
-import type { ApiError, Article, Citation, CitationReference, Contract, ContractMap, Location, LocationsResponse, NewsQuery, NewsResponse, SchemaName, Source } from '../index.js';
+import { schemas } from "../index.js";
+import { Ajv } from "ajv";
+import addFormats from "ajv-formats";
+import type {
+  ApiError,
+  Article,
+  Citation,
+  CitationReference,
+  Contract,
+  ContractMap,
+  Location,
+  LocationsResponse,
+  NewsQuery,
+  NewsResponse,
+  SchemaName,
+  Source,
+} from "../index.js";
+import type {
+  AssistantRequest,
+  AssistantDraft,
+  AssistantResponse,
+  UIAction,
+  Observation,
+  CompareObservationsArgs,
+  InvestigationQuery,
+  FocusLocationArgs,
+} from "../index.js";
 
 type Expect<T extends true> = T;
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
 type _RegistryMatchesTypes = Expect<Equal<SchemaName, keyof ContractMap>>;
-type _Provider = Expect<Equal<Article['provider'], 'curated' | 'gdelt' | 'rss'>>;
-type _Coordinates = Expect<Equal<Location['coordinates'], [number, number] | null>>;
-type _Bounds = Expect<Equal<NonNullable<NewsQuery['bounds']>, [number, number, number, number]>>;
-type _OptionalDate = Expect<Equal<Article['published_date'], string | null | undefined>>;
-type _NullableSourceTime = Expect<Equal<Source['retrieved_at'], string | null>>;
-type _Citation = Expect<Equal<Citation, Contract<'Citation'>>>;
-type _QueryKeys = Expect<Equal<keyof NewsQuery, 'location_ids' | 'themes' | 'entity_ids' | 'bounds' | 'keyword' | 'semantic_query' | 'published_from' | 'published_to' | 'limit' | 'offset'>>;
-type _NewsArticle = Expect<Equal<NewsResponse['items'][number], Article>>;
-type _ResponseLocation = Expect<Equal<LocationsResponse['items'][number], Location>>;
-type _StoredNotLive = Expect<Equal<NewsResponse['coverage']['live'], false>>;
-type _RequestId = Expect<Equal<ApiError['error']['request_id'], string>>;
+type _Provider = Expect<
+  Equal<Article["provider"], "curated" | "gdelt" | "rss">
+>;
+type _Coordinates = Expect<
+  Equal<Location["coordinates"], [number, number] | null>
+>;
+type _Bounds = Expect<
+  Equal<NonNullable<NewsQuery["bounds"]>, [number, number, number, number]>
+>;
+type _OptionalDate = Expect<
+  Equal<Article["published_date"], string | null | undefined>
+>;
+type _NullableSourceTime = Expect<Equal<Source["retrieved_at"], string | null>>;
+type _Citation = Expect<Equal<Citation, Contract<"Citation">>>;
+type _QueryKeys = Expect<
+  Equal<
+    keyof NewsQuery,
+    | "location_ids"
+    | "themes"
+    | "entity_ids"
+    | "bounds"
+    | "keyword"
+    | "semantic_query"
+    | "published_from"
+    | "published_to"
+    | "limit"
+    | "offset"
+  >
+>;
+type _NewsArticle = Expect<Equal<NewsResponse["items"][number], Article>>;
+type _ResponseLocation = Expect<
+  Equal<LocationsResponse["items"][number], Location>
+>;
+type _StoredNotLive = Expect<Equal<NewsResponse["coverage"]["live"], false>>;
+type _RequestId = Expect<Equal<ApiError["error"]["request_id"], string>>;
+type _Audience = Expect<
+  Equal<
+    AssistantRequest["audience"],
+    "general_public" | "journalist" | "investor" | undefined
+  >
+>;
+type _DraftCitation = Expect<
+  Equal<AssistantDraft["citations"][number], CitationReference>
+>;
+type _ResolvedCitation = Expect<
+  Equal<AssistantResponse["citations"][number], Citation>
+>;
+type _ObservationValue = Expect<Equal<Observation["value"], number | null>>;
+type _ObservationPeriod = Expect<
+  Equal<Observation["period_start"], string | null>
+>;
+type _OnlyActions = Expect<
+  Equal<UIAction["type"], "set_filters" | "focus_location">
+>;
+type _InvestigationID = Expect<Equal<InvestigationQuery, { id: string }>>;
+type _FocusID = Expect<Equal<FocusLocationArgs, { location_id: string }>>;
 
-const query: NewsQuery = { location_ids: ['loc-asheville-nc'], bounds: [-83, 35, -82, 36], limit: 20 };
-const citation: Citation = { source_id: 'src-usgs-alert-2024-09-30', record_id: 'art-usgs-alert-2024-09-30', url: 'https://water.usgs.gov/', title: 'USGS' };
-const reference: CitationReference = { source_id: citation.source_id, record_id: citation.record_id };
+const legacyAudience: AssistantRequest = {
+  request_id: "r",
+  message: "question",
+  timezone: "UTC",
+  // @ts-expect-error The audience wire enum is general_public.
+  audience: "public",
+};
+// @ts-expect-error Comparison requires both location and metric.
+const incompleteComparison: CompareObservationsArgs = { metric: "discharge" };
+const arbitraryCamera: UIAction = {
+  type: "focus_location",
+  // @ts-expect-error UI actions cannot contain arbitrary camera coordinates.
+  coordinates: [0, 0],
+};
+
+const query: NewsQuery = {
+  location_ids: ["loc-asheville-nc"],
+  bounds: [-83, 35, -82, 36],
+  limit: 20,
+};
+const citation: Citation = {
+  source_id: "src-usgs-alert-2024-09-30",
+  record_id: "art-usgs-alert-2024-09-30",
+  url: "https://water.usgs.gov/",
+  title: "USGS",
+};
+const reference: CitationReference = {
+  source_id: citation.source_id,
+  record_id: citation.record_id,
+};
 
 // The schema registry is directly consumable by Ajv, including its type-guard API.
 const ajv = new Ajv();
 addFormats.default(ajv);
-for (const [name, schema] of Object.entries(schemas)) ajv.addSchema(schema, name);
+for (const [name, schema] of Object.entries(schemas))
+  ajv.addSchema(schema, name);
 const validateArticle = ajv.compile<Article>(schemas.Article);
 declare const payload: unknown;
 if (validateArticle(payload)) {
@@ -37,9 +136,9 @@ if (validateArticle(payload)) {
 // @ts-expect-error Domain schemas are a closed, named registry.
 schemas.UnknownRecord;
 // @ts-expect-error Unknown request fields are not accepted.
-const unknownQuery: NewsQuery = { sql: 'SELECT 1' };
+const unknownQuery: NewsQuery = { sql: "SELECT 1" };
 // @ts-expect-error GET strings must be normalized before validation.
-const stringLimit: NewsQuery = { limit: '20' };
+const stringLimit: NewsQuery = { limit: "20" };
 // @ts-expect-error A bounds tuple always contains four numbers.
 const shortBounds: NewsQuery = { bounds: [1, 2] };
 // @ts-expect-error An unresolved reference cannot supply its own URL.
@@ -51,12 +150,28 @@ declare const article: Article;
 declare const location: Location;
 declare const source: Source;
 // @ts-expect-error Provider is a closed enum.
-const wrongProvider: Article = { ...article, provider: 'invented' };
+const wrongProvider: Article = { ...article, provider: "invented" };
 // @ts-expect-error Missing measurements are represented by null, not absent coordinate fields.
-const missingCoordinates: Location = { id: 'loc-test', name: 'Test', precision: 'city' };
+const missingCoordinates: Location = {
+  id: "loc-test",
+  name: "Test",
+  precision: "city",
+};
 // @ts-expect-error Geographic precision is an enum, not an arbitrary label.
-const wrongPrecision: Location = { ...location, precision: 'exact' };
+const wrongPrecision: Location = { ...location, precision: "exact" };
 // @ts-expect-error Nullable fields must be handled before dereferencing.
 source.retrieved_at.toUpperCase();
 
-void [query, citation, reference, unknownQuery, stringLimit, shortBounds, unsafeReference, incompleteCitation, wrongProvider, missingCoordinates, wrongPrecision];
+void [
+  query,
+  citation,
+  reference,
+  unknownQuery,
+  stringLimit,
+  shortBounds,
+  unsafeReference,
+  incompleteCitation,
+  wrongProvider,
+  missingCoordinates,
+  wrongPrecision,
+];
