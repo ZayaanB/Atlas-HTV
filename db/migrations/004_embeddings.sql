@@ -1,0 +1,1 @@
+-- Scaffold only. Person 4 with Person 3: source/chunk embedding storage after model dimensions/version are fixed. No vector schema or indexes yet.

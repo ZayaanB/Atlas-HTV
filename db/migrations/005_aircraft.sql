@@ -1,0 +1,1 @@
+-- Scaffold only. Person 4: separate aircraft dataset/schema and bounded retention consistent with provider licensing. No SQL statements yet.

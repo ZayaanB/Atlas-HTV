@@ -1,0 +1,1 @@
+-- Scaffold only. Person 4: define source-linked relational records against shared contracts and agreed Person 3 queries. No tables yet.

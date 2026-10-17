@@ -1,0 +1,1 @@
+-- Scaffold only. Person 4: real observation hypertable, meaningful aggregate, refresh policy, units/source metadata. No invented measurements.

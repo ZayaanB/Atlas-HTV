@@ -1,0 +1,1 @@
+# Scaffold only. Person 4: later serve the built frontend and reverse-proxy /api to the agreed backend address under HTTPS. No domain or active Caddy directives yet.

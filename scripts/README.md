@@ -1,3 +1,3 @@
 # Shared tooling
 
-Reserved for later import/startup commands. Person 4 owns source/seed definitions; Person 3 owns backend ingestion execution. Agree file ownership before adding scripts. No runnable scripts are supplied yet.
+`source-definitions/` belongs to Person 4: reviewed source/import definitions and license metadata. Person 3 owns executable backend ingestion in `backend/`. Person 1 owns future root startup orchestration. Agree formats and file ownership before implementation. No runnable commands exist yet; root AGENTS phase gate applies.

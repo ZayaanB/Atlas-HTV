@@ -1,0 +1,1 @@
+-- Scaffold only. Person 4: verify and enable TimescaleDB/pgvector on the chosen Tiger Cloud service when authorized. No SQL statements yet.
