@@ -1,2 +1,6 @@
-// Scaffold only; no implementation.
-// GET /api/news: validate shared filters and use canonical retrieval. Return matching records, coverage, timestamp semantics, and freshness; do not call providers per browser request.
+import type { FastifyInstance } from 'fastify';
+import type { Services } from '../runtime/services.js';
+import { normalizeQuery } from '../services/validation.js';
+export function newsRoutes(app: FastifyInstance, services: Services) {
+  app.get('/api/news', request => services.retrieval.news(normalizeQuery(request.query),request.atlasSignal));
+}

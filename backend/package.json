@@ -1,0 +1,33 @@
+{
+  "name": "@atlas/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "node --import tsx --test test/*.test.ts",
+    "ingest": "node --env-file-if-exists=.env --import tsx src/ingest.ts",
+    "embed": "node --env-file-if-exists=.env --import tsx src/embed.ts"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "11.2.1",
+    "@google/genai": "2.30.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "fast-xml-parser": "5.11.2",
+    "fastify": "5.12.7",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}
