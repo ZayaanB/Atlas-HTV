@@ -1,0 +1,130 @@
+{
+  "tool": "Built-in image_gen",
+  "purpose": "Preview concepts for Atlas, not evidence imagery or implemented UI.",
+  "basePrompt": "Use case: ui-mockup.\nCreate ONE exceptionally polished, high-fidelity desktop screenshot concept of Atlas, a minimal Apple-inspired geographic news exploration web app, landscape 16:10. This is a design comparison image, not an illustration of a monitor. Edge-to-edge app screenshot with no device frame.\nLOCKED COMPOSITION FOR ALL VARIANTS: background near-black #06090d; top-left small beautifully spaced sans-serif wordmark \"ATLAS\", at 3% from left and 5% from top. A fully visible, generously scaled globe with thin realistic blue atmospheric rim centered at x=42%, y=49%, diameter about 80% of image height, facing North America. Earth is absolutely the visual hero. Four tiny ice-blue story markers, no routes, data grids or fake readouts. One single floating news panel on the right at x=74% to 97%, y=16% to 80%, with 22px-equivalent corner radius and carefully balanced generous padding, never wider than 24% of screen. It occupies dark space beside globe and only slightly overlaps its far right edge. Bottom-center a very small immaculate capsule dock, only two understated icon+text actions \"Search\" and \"News\", with News softly selected. A single discreet map-layers icon bottom left. In bottom-right reserved small text \"Design concept\". No sidebar, top navigation bar, extra buttons, marketing heading, color gradient blobs, chart, aircraft, sci-fi HUD, satellite spacecraft, rings, excessive glow or cartoon geography.\nIdentical short panel text across variants, render words cleanly and accurately:\nsmall header \"News\" and close × at top right.\nsmall line \"HISTORICAL EXAMPLE · 2024\"\nheadline \"Hurricane Helene\"\nsubheading \"Asheville, North Carolina\"\nbody \"Explore reporting and evidence from the 2024 storm.\"\na thin divider, then small muted \"Sources & context\" and a quiet row \"View coverage\" with right arrow.\nLeave generous empty breathing room inside panel; editorial precision, not a stack of cards.\nAll typography clean system sans-serif except explicitly newspaper style. Minimal, modern, extremely high-quality UI craft, crisp readable text, exquisite alignment, measured shadows, restrained cool accent. Globe dominates the whole viewport. Do not put variation labels or annotation frames inside image.",
+  "earthTreatments": [
+    {
+      "id": "night",
+      "title": "Night Earth",
+      "text": "EARTH TREATMENT: realistic night Earth. Charcoal continents, almost-black blue oceans, fine delicate warm city lights accurately distributed across North America, subtle dark relief and thin cool atmospheric rim. Entire Earth on night side with enough form to read the sphere. No sunlit land, no cloud blanket hiding city lights."
+    },
+    {
+      "id": "day",
+      "title": "Day Earth",
+      "text": "EARTH TREATMENT: realistic daylight natural-color Earth. Deep clean blue oceans, muted green and tan terrain, delicate white cloud wisps, softly sunlit North America, realistic geography and slender blue atmosphere. Full sphere visible with subtle edge shading; mostly sunlit, not night cities. Keep surrounding app dark."
+    },
+    {
+      "id": "cartographic",
+      "title": "Cartographic Earth",
+      "text": "EARTH TREATMENT: a refined dark cartographic 3D globe, muted slate charcoal land, ink-blue oceans, delicate national and regional boundary lines, restrained geographic labels including Canada, United States, Mexico. Subtle terrain shading, no satellite texture, no city light texture, no latitude-longitude grid. An elegant readable map wrapped around a globe."
+    }
+  ],
+  "panelTreatments": [
+    {
+      "id": "dark",
+      "title": "Dark",
+      "text": "PANEL TREATMENT: completely opaque rich charcoal-black panel #101114 with off-white text, hairline subtle gray border, exquisitely soft shadow, no transparency or blur. Quiet system sans-serif typography, headline 26px equivalent medium weight. Match dock material to dark panel."
+    },
+    {
+      "id": "glass",
+      "title": "Liquid glass",
+      "text": "PANEL TREATMENT: authentic Apple-inspired transparent liquid glass. Strong enough transparency to see the globe edge through the panel, optical refraction of underlying blue atmosphere and land contours, gently frosted central reading area, exquisite luminous curved edge highlights with a faint specular gleam, dark smoky glass tinted by Earth. Off-white legible text, no milky opaque card, no gaudy rainbow highlights. Dock in same glass material. Convincing rich transparent material while preserving minimal app UI."
+    },
+    {
+      "id": "newspaper",
+      "title": "Newspaper",
+      "text": "PANEL TREATMENT: refined warm ivory newsprint panel, faint tactile paper grain, dark ink typography, elegant editorial serif headline and serif body text, small classic newspaper typographic rules and precise vertical rhythm. This is a contemporary editorial newspaper inset, not a scanned old newspaper. No fake newspaper masthead, columns too narrow to read, torn edges, sepia illustrations or clutter. Keep panel shape and location identical. Surrounding app and globe remain dark and modern. Dock remains dark charcoal."
+    },
+    {
+      "id": "space",
+      "title": "Space",
+      "text": "PANEL TREATMENT: restrained space-inspired dark midnight navy panel with a subtle fine star-dust texture in its material, exceptionally delicate cool icy rim light and faint celestial depth in otherwise calm surface. Cool off-white elegant sans-serif typography and small monospaced eyebrow. Tiny quiet points of light, not decorative dashboard readouts, neon, space ships or busy sci-fi HUD. Match dock material to midnight panel. Keep the app restrained, minimal and sophisticated."
+    }
+  ],
+  "images": [
+    {
+      "earth": "night",
+      "panel": "dark",
+      "title": "Night Earth · Dark",
+      "file": "night-dark.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-a89912d9-3dde-4d23-8977-7c159854d117.png"
+    },
+    {
+      "earth": "night",
+      "panel": "glass",
+      "title": "Night Earth · Liquid glass",
+      "file": "night-glass.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-c0fc6bc7-eff2-4b1f-96ba-2ec7f17cb0a0.png"
+    },
+    {
+      "earth": "night",
+      "panel": "newspaper",
+      "title": "Night Earth · Newspaper",
+      "file": "night-newspaper.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-c4b7eef6-ac5e-499a-b0e0-9c317f1ca6d5.png"
+    },
+    {
+      "earth": "night",
+      "panel": "space",
+      "title": "Night Earth · Space",
+      "file": "night-space.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-c2d2df53-17fc-4d03-b1ab-4806bd318f68.png"
+    },
+    {
+      "earth": "day",
+      "panel": "dark",
+      "title": "Day Earth · Dark",
+      "file": "day-dark.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-4e42b8d1-a9bd-4d69-b1ed-3ce1f54023a8.png"
+    },
+    {
+      "earth": "day",
+      "panel": "glass",
+      "title": "Day Earth · Liquid glass",
+      "file": "day-glass.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-2fa398f0-fc6a-4274-8282-ca06a45ae3be.png"
+    },
+    {
+      "earth": "day",
+      "panel": "newspaper",
+      "title": "Day Earth · Newspaper",
+      "file": "day-newspaper.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-95e7aa2f-3bfd-4d32-a756-7527c2ae0a1c.png"
+    },
+    {
+      "earth": "day",
+      "panel": "space",
+      "title": "Day Earth · Space",
+      "file": "day-space.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-f2426b8a-c45c-4fd5-b658-8103976fbead.png"
+    },
+    {
+      "earth": "cartographic",
+      "panel": "dark",
+      "title": "Cartographic Earth · Dark",
+      "file": "cartographic-dark.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-c8b5f141-fc9e-429b-95ba-dcac8ec506da.png"
+    },
+    {
+      "earth": "cartographic",
+      "panel": "glass",
+      "title": "Cartographic Earth · Liquid glass",
+      "file": "cartographic-glass.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-3db33f38-bfa1-431d-ad46-b00fbd63b9e4.png"
+    },
+    {
+      "earth": "cartographic",
+      "panel": "newspaper",
+      "title": "Cartographic Earth · Newspaper",
+      "file": "cartographic-newspaper.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-7c208761-7efb-44e5-8351-00b835cfb071.png"
+    },
+    {
+      "earth": "cartographic",
+      "panel": "space",
+      "title": "Cartographic Earth · Space",
+      "file": "cartographic-space.png",
+      "source": "/Users/anoch/.codex/generated_images/01a14bcf-dcc2-7602-ae1c-41ba596c0da9/exec-04e701df-8252-4012-9cca-1c9f382304e3.png"
+    }
+  ]
+}

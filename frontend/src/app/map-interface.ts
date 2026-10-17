@@ -1,17 +1,32 @@
-import type { Article, Coverage, Location } from '@atlas/contracts';
+import type {
+  AircraftState,
+  Article,
+  Coverage,
+  Evidence,
+  Location,
+} from "@atlas/contracts";
 
-export type Coordinates = NonNullable<Location['coordinates']>;
-export type Bounds = NonNullable<Location['bounds']>;
-export type BasemapPreference = 'auto' | 'map' | 'satellite';
+export type Coordinates = NonNullable<Location["coordinates"]>;
+export type Bounds = NonNullable<Location["bounds"]>;
+export type BasemapPreference = "auto" | "map" | "satellite";
 export type CameraCommand = { id: string } & (
-  | { type: 'fit_bounds'; bounds: Bounds }
-  | { type: 'focus_point'; coordinates: Coordinates }
-  | { type: 'return_to_globe' }
+  | { type: "fit_bounds"; bounds: Bounds }
+  | { type: "focus_point"; coordinates: Coordinates }
+  | { type: "return_to_globe" }
+  | { type: "zoom"; delta: number }
 );
-export interface ViewportSnapshot { bounds: Bounds; center: Coordinates; zoom: number }
-export interface MapSelection { articleId: string | null; locationId: string | null }
+export interface ViewportSnapshot {
+  userInitiated?: boolean;
+  bounds: Bounds;
+  center: Coordinates;
+  zoom: number;
+}
+export interface MapSelection {
+  articleId: string | null;
+  locationId: string | null;
+}
 export interface MapDataStatus {
-  state: 'loading' | 'error' | 'empty' | 'ready';
+  state: "loading" | "error" | "empty" | "ready";
   refreshing: boolean;
   error: string | null;
   coverage: Coverage | null;
@@ -19,6 +34,11 @@ export interface MapDataStatus {
 }
 /** The integration boundary. Map internals do not import the store or fetch data. */
 export interface AtlasMapProps {
+  overlayInsets?: { top: number; right: number; bottom: number; left: number };
+  evidenceOverlay?: { evidence: Evidence; url: string; opacity: number } | null;
+  aircraft?: readonly AircraftState[];
+  selectedAircraftId?: string | null;
+  onSelectAircraft?: (id: string) => void;
   articles: readonly Article[];
   locations: readonly Location[];
   status: MapDataStatus;

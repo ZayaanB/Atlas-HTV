@@ -7,12 +7,13 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./schemas/*.json": "./dist/schemas/*.json",
-    "./examples/helene-api.json": "./examples/helene-api.json"
+    "./examples/helene-api.json": "./examples/helene-api.json",
+    "./examples/helene-research.json": "./examples/helene-research.json"
   },
   "files": ["dist", "examples", "README.md"],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/export-json.mjs",
-    "examples:generate": "node scripts/seed-examples.mjs && node scripts/api-examples.mjs",
+    "examples:generate": "node scripts/seed-examples.mjs && node scripts/api-examples.mjs && node scripts/research-examples.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "npm run build && node --test test/schemas.test.mjs",
     "test:backend": "npm run build && node --import tsx --test test/backend.test.mjs"

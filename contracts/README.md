@@ -2,7 +2,7 @@
 
 One authoritative JSON Schema draft-07 set for frontend and backend. `schemas/*.ts` contains plain, serializable schema definitions; `index.ts` exports the backend-compatible `schemas` registry and types inferred with `json-schema-to-ts`. There are no separately maintained frontend/backend interfaces or validators.
 
-This includes the authorized core-contract and frontend-foundation slices, not the complete API. Frontend consumers use Zustand and TanStack Query; backend/database/map implementations remain unchanged by this slice.
+Frontend consumers use Zustand and TanStack Query. The assistant and research contracts match the existing backend payloads and frozen database projections. Backend/database executable implementations are unchanged; exact integration and external setup dependencies are recorded in [the research handoff](../frontend/docs/research-handoff.md).
 
 ## Available contracts
 
@@ -32,9 +32,9 @@ Build outputs are ignored by Git and must be rebuilt after schema changes:
 
 - `contracts/dist/index.js`: portable ESM exporting `schemas`; no runtime dependency imports.
 - `contracts/dist/index.d.ts`: schema-derived TypeScript exports, including `SchemaName`, `ContractMap`, and `Contract<Name>`.
-- `contracts/dist/schemas/*.json`: self-contained JSON Schemas generated for every exported name from the same definitions. Do not edit or copy them into another workstream.
+- `contracts/dist/schemas/*.json`: named JSON Schemas generated for every exported name (register the complete registry to resolve references) from the same definitions. Do not edit or copy them into another workstream.
 
-The package exports its root module, `@atlas/contracts/schemas/Article.json` (and the other named JSON files), and `@atlas/contracts/examples/helene-api.json`. The frontend depends on `@atlas/contracts` via `file:../contracts`; build this package first. Type inference is type-only; `json-schema-to-ts` remains a package dependency because the exported declarations reference it.
+The package exports its root module, `@atlas/contracts/schemas/Article.json` (and the other named JSON files), and `@atlas/contracts/examples/helene-api.json` / `helene-research.json`. The frontend depends on `@atlas/contracts` via `file:../contracts`; build this package first. Type inference is type-only; `json-schema-to-ts` remains a package dependency because the exported declarations reference it.
 
 ```ts
 import { schemas } from '@atlas/contracts';
@@ -85,7 +85,23 @@ npm --prefix contracts run test:backend
 
 These checks import the actual backend loader, query normalizer, article normalizer, and citation ledger. They also run its configuration checker with a sanitized environment and no `.env` file. They open no database connection and call no providers.
 
-**Partial readiness is intentional.** Eight of the backend's 24 required schemas are supplied; `CitationReference`, `Coverage`, and `ApiError` are supporting definitions. Its configuration check still reports **16 missing schemas**. News/location retrieval now has the necessary schemas, but actual API success depends on backend/database setup; overall readiness remains incomplete. No permissive schemas are added to make the backend report ready.
+**Contract readiness is complete.** All 24 schemas required by the current backend are supplied, plus supporting research and workspace definitions (31 named schemas total). Runtime readiness still depends on the frozen query handoff, database configuration and service setup. No permissive schemas were introduced to hide missing integrations.
+
+Additional contracts: `Investigation`, `InvestigationResponse`, `InvestigationQuery`, `Evidence`, `ObservationSeries`, `Observation`, `ObservationsQuery`, `ObservationsResponse`, `CompareObservationsArgs`, `AssistantRequest`, `AssistantDraft`, `AssistantResponse`, `UIAction`, `FocusLocationArgs`, `FlightRegion`, `FlightsQuery`, `FlightsResponse`, `FindAircraftArgs`, `AircraftState`, and `WorkspaceResponse`.
+
+`WorkspaceResponse` remains optional catalog metadata for explicit article/investigation associations, option labels, and reviewed flight regions. Assistant and timeline access do not depend on this endpoint or its legacy context/series capability flags. Existing flight definitions are unchanged; no permissive readiness placeholders are added.
+
+### Assistant and research contract details
+
+`AssistantRequest` requires `request_id`, nonblank `message` (up to 4,000 characters) and `timezone` (up to 100 characters). Optional fields are `filters: NewsQuery`, `selected_investigation_id`, `allow_ui_actions`, and `audience: general_public | journalist | investor`. The old speculative history/selected-article fields are not accepted. An omitted `allow_ui_actions` does not authorize workspace changes; the backend validates IANA timezone names.
+
+`AssistantDraft` is model-only: `answer` (up to 12,000 characters), up to 100 citation references, up to 100 result IDs and up to 8 actions. It embeds canonical definitions without external `$ref` values and compiles independently for deriving Gemini's `respond` declaration. Model citations carry source/record IDs only; the backend resolves URL/title through its retrieval ledger. `AssistantResponse` adds the matched request ID, resolved citations, coverage, live/fixture/fallback mode and bounded errors. HTTP error envelopes remain unchanged.
+
+`UIAction` accepts only `{type:"set_filters",filters:NewsQuery}` and `{type:"focus_location",location_id}`. No arbitrary camera coordinates, SQL, code or URL fetching is accepted. Schema validation does not authorize actions or establish their grounding.
+
+`InvestigationQuery` is `{id}`. `InvestigationResponse` includes the resolved investigation, articles, evidence, observations, observation series, locations and sources. All frozen observation fields are required: `id`, `series_id`, `location_id`, `metric`, `value`, `unit`, `statistic`, `source_id`, `observed_at`, `qualifiers`, `time_precision`, `period_start`, `period_end`, `fetched_at`. Values and both period boundaries preserve explicit nulls; precision/statistic enums match the database. Series metadata preserves coverage and retrieval timestamps, expected interval, licensing, attribution and missing-data rules.
+
+`ObservationsQuery` uses optional `location_id`, `metric`, `observed_from`, `observed_to`, `limit`, `offset`. No unsupported `series_id` filter is accepted: the frozen database uniquely identifies each series by location and metric. `CompareObservationsArgs` requires that pair and allows observation range/limit, without offset. `ObservationsResponse` returns raw items and coverage; comparison optionally adds nullable endpoints/difference/unit and a limitation. It does not claim complete-period aggregates. Its dates are observation dates, distinct from publication/event/fetch times.
 
 ## Field conventions and boundaries
 
@@ -100,4 +116,4 @@ These checks import the actual backend loader, query normalizer, article normali
 - Citation grounding, known-ID resolution, source–record relationships, filter execution, provider rights and SQL remain Person 3/Person 4 responsibilities. No network fetch policy is implemented by these schemas.
 - Schema `$id` values use the reserved `atlas.invalid` namespace as identifiers, never as URLs to fetch. Register the local schemas before compiling references.
 
-See [shared examples](examples/README.md) for seed provenance and regeneration. Future investigation, evidence, observation and action schemas belong here when separately implemented; consumers must not create private replacements.
+See [shared examples](examples/README.md) for seed provenance and regeneration. Investigation, evidence, observation and action schemas live here; consumers must not create private replacements.

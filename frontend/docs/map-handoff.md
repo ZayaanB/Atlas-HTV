@@ -1,6 +1,6 @@
 # Person 2 map handoff
 
-The frontend foundation is runnable independently in explicit fixture mode. Follow `../README.md` for startup. This is the Person 1 integration boundary; the map subtree remains owned by Person 2.
+The full frontend is runnable independently in explicit historical fixture mode. Follow `../README.md` for startup. This is the Person 1 integration boundary; the implemented map subtree remains owned by Person 2.
 
 ## Component contract
 
@@ -26,3 +26,9 @@ Aircraft selection remains separate in the store; aircraft/evidence data inputs 
 ## First integration verification
 
 Run fixture mode, verify map and feed use the same page, select in both directions, focus a sourced city extent, pan without changing the feed, apply Search this area, and return to globe without clearing filters. Verify the renderer tolerates missing locations, loading/empty/error states, and repeated React renders. Actual Mapbox navigation, attribution, precision, reduced motion, style restoration, and token restrictions remain Person 2's checks when rendering is implemented.
+
+## Implemented interface additions
+
+The map accepts measured `overlayInsets`, a validated local `evidenceOverlay`, typed `aircraft`, `selectedAircraftId` and `onSelectAircraft`. The browser may send a bounded relative `zoom` camera command. Viewport snapshots identify user-initiated navigation so the shell does not offer area search after every programmatic move. Multi-article locations emit a null article ID with the location ID, opening the associated current-page news list.
+
+Home framing preserves a complete centered globe on desktop and accounts for bottom-sheet occlusion on smaller screens. No-token mode does not instantiate Mapbox or contact its servers. Basemap rendering, style restoration and image placement still need provider-backed smoke verification with separately authorized access.

@@ -1,10 +1,41 @@
-import { create } from 'zustand';
-import type { Location, NewsQuery } from '@atlas/contracts';
-import { isSearchableBounds, normalizeNewsQuery } from '../lib/api';
-import type { BasemapPreference, CameraCommand, Coordinates, MapSelection, ViewportSnapshot } from './map-interface';
+import { create } from "zustand";
+import type { Location, NewsQuery } from "@atlas/contracts";
+import { isSearchableBounds, normalizeNewsQuery } from "../lib/api";
+import type {
+  BasemapPreference,
+  CameraCommand,
+  Coordinates,
+  MapSelection,
+  ViewportSnapshot,
+} from "./map-interface";
 
-type CameraIntent = CameraCommand extends infer Command ? Command extends CameraCommand ? Omit<Command, 'id'> : never : never;
+type CameraIntent = CameraCommand extends infer Command
+  ? Command extends CameraCommand
+    ? Omit<Command, "id">
+    : never
+  : never;
+export type PanelView =
+  | "search"
+  | "news"
+  | "article"
+  | "assistant"
+  | "investigation"
+  | "saved"
+  | "coverage"
+  | "coordinates"
+  | "aircraft";
+export interface PanelRoute {
+  view: PanelView;
+  id?: string | undefined;
+}
 interface WorkspaceState {
+  panel: PanelRoute | null;
+  panelHistory: PanelRoute[];
+  sheetExpanded: boolean;
+  openPanel: (route: PanelRoute, root?: boolean) => void;
+  closePanel: () => void;
+  backPanel: () => void;
+  setSheetExpanded: (expanded: boolean) => void;
   filters: NewsQuery;
   selection: MapSelection;
   selectedInvestigationId: string | null;
@@ -31,35 +62,88 @@ interface WorkspaceState {
 /** Factory gives each test/workspace independent state. No server data is persisted. */
 export function createWorkspaceStore() {
   return create<WorkspaceState>((set, get) => ({
-    filters: { limit: 50, offset: 0 }, selection: { articleId: null, locationId: null },
-    selectedInvestigationId: null, selectedAircraftId: null,
-    basemap: 'auto', viewport: null, inspectedCoordinates: null, cameraCommand: null, contextRevision: 0,
-    applyFilters: filters => set(state => ({
-      filters: normalizeNewsQuery({ ...filters, offset: 0 }), selection: { articleId: null, locationId: null },
-      cameraCommand: null,
-      contextRevision: state.contextRevision + 1
-    })),
-    setPage: offset => set(state => ({
-      filters: normalizeNewsQuery({ ...state.filters, offset }), selection: { articleId: null, locationId: null },
-      cameraCommand: null,
-      contextRevision: state.contextRevision + 1
-    })),
-    select: selection => set(state => ({ selection, cameraCommand: null, contextRevision: state.contextRevision + 1 })),
-    selectAircraft: selectedAircraftId => set({ selectedAircraftId }),
-    selectInvestigation: selectedInvestigationId => set(state => ({ selectedInvestigationId, contextRevision: state.contextRevision + 1 })),
-    setBasemap: basemap => set({ basemap }),
-    setViewport: viewport => set({ viewport }),
+    panel: null,
+    panelHistory: [],
+    sheetExpanded: false,
+    openPanel: (panel, root = false) =>
+      set((state) => ({
+        panel,
+        panelHistory: root
+          ? []
+          : state.panel
+            ? [...state.panelHistory, state.panel].slice(-16)
+            : state.panelHistory,
+      })),
+    closePanel: () => set({ panel: null }),
+    backPanel: () =>
+      set((state) => ({
+        panel: state.panelHistory.at(-1) ?? null,
+        panelHistory: state.panelHistory.slice(0, -1),
+      })),
+    setSheetExpanded: (sheetExpanded) => set({ sheetExpanded }),
+    filters: { limit: 50, offset: 0 },
+    selection: { articleId: null, locationId: null },
+    selectedInvestigationId: null,
+    selectedAircraftId: null,
+    basemap: "auto",
+    viewport: null,
+    inspectedCoordinates: null,
+    cameraCommand: null,
+    contextRevision: 0,
+    applyFilters: (filters) =>
+      set((state) => ({
+        filters: normalizeNewsQuery({ ...filters, offset: 0 }),
+        selection: { articleId: null, locationId: null },
+        selectedInvestigationId: null,
+        cameraCommand: null,
+        contextRevision: state.contextRevision + 1,
+      })),
+    setPage: (offset) =>
+      set((state) => ({
+        filters: normalizeNewsQuery({ ...state.filters, offset }),
+        selection: { articleId: null, locationId: null },
+        selectedInvestigationId: null,
+        cameraCommand: null,
+        contextRevision: state.contextRevision + 1,
+      })),
+    select: (selection) =>
+      set((state) => ({
+        selection,
+        cameraCommand: null,
+        contextRevision: state.contextRevision + 1,
+      })),
+    selectAircraft: (selectedAircraftId) => set({ selectedAircraftId }),
+    selectInvestigation: (selectedInvestigationId) =>
+      set((state) => ({
+        selectedInvestigationId,
+        contextRevision: state.contextRevision + 1,
+      })),
+    setBasemap: (basemap) => set({ basemap }),
+    setViewport: (viewport) => set({ viewport }),
     searchArea: () => {
       const { viewport, filters } = get();
-      if (viewport && isSearchableBounds(viewport.bounds)) get().applyFilters({ ...filters, bounds: [...viewport.bounds] });
+      if (viewport && isSearchableBounds(viewport.bounds))
+        get().applyFilters({ ...filters, bounds: [...viewport.bounds] });
     },
-    inspectCoordinates: inspectedCoordinates => set({ inspectedCoordinates }),
-    focusLocation: location => {
-      if (location.bounds) get().requestCamera({ type: 'fit_bounds', bounds: [...location.bounds] });
-      else if (location.coordinates) get().requestCamera({ type: 'focus_point', coordinates: [...location.coordinates] });
+    inspectCoordinates: (inspectedCoordinates) => set({ inspectedCoordinates }),
+    focusLocation: (location) => {
+      if (location.bounds)
+        get().requestCamera({
+          type: "fit_bounds",
+          bounds: [...location.bounds],
+        });
+      else if (location.coordinates)
+        get().requestCamera({
+          type: "focus_point",
+          coordinates: [...location.coordinates],
+        });
     },
-    requestCamera: intent => set({ cameraCommand: { ...intent, id: crypto.randomUUID() } }),
-    acknowledgeCamera: id => set(state => state.cameraCommand?.id === id ? { cameraCommand: null } : {})
+    requestCamera: (intent) =>
+      set({ cameraCommand: { ...intent, id: crypto.randomUUID() } }),
+    acknowledgeCamera: (id) =>
+      set((state) =>
+        state.cameraCommand?.id === id ? { cameraCommand: null } : {},
+      ),
   }));
 }
 export const useWorkspace = createWorkspaceStore();

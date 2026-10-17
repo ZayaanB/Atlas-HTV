@@ -1,6 +1,6 @@
 # Person 1 — Frontend and integration lead
 
-Read root `AGENTS.md` and `atlas_prd.md`. The approved frontend foundation is now authorized and implemented; see `frontend/README.md` for its boundaries. Remaining feature implementations require their own scope.
+Read root `AGENTS.md` and `atlas_prd.md`. The complete globe-first frontend plan is authorized and implemented; see `frontend/README.md` and `frontend/docs/research-handoff.md` for its boundaries and backend handoffs.
 
 Own frontend entry/configuration, `src/app/`, feed/AI/research features, shared styles, frontend dependencies, `contracts/`, root integration tooling/docs. Person 2 owns map feature internals. Do not edit backend or database implementations for another owner.
 

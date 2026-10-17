@@ -2,7 +2,9 @@
 
 ## Current phase
 
-**Person 1's frontend foundation is authorized** by the explicit instruction to implement its approved plan: React/Vite, Zustand, TanStack Query, news/location contracts, typed API access, labeled historical fixtures, minimal map/feed shell, and Person 2's integration interface. Router and remaining feature implementations are deferred. Existing backend/data implementations have their own handoff instructions; this authorization does not expand their scope. Do not run migrations/imports, call paid/provider APIs, provision resources, deploy, or publish as part of this slice. Map feature files remain Person 2's placeholders until separately implemented.
+**The complete frontend implementation plan is authorized** by the user's explicit “Implement the plan” instruction: Night Earth · Dark shell, shared contracts, source-derived historical research, on-demand panels, assistant integration, timeline/evidence, saves, and bounded aircraft rendering. Dark cartography approximates the night-Earth concept; real city-light imagery is excluded. Person 1 owns frontend/contracts integration and Person 2 owns map internals. Backend interface changes are documented for Person 3 to integrate in `frontend/docs/research-handoff.md`.
+
+Do not run migrations/imports, call paid/provider APIs, provision resources, deploy or publish as part of this slice. Existing backend/data implementations keep their own ownership and execution boundaries. No live provider/database integration is claimed by the frontend's historical fixtures or automated tests.
 
 ## Read first
 
