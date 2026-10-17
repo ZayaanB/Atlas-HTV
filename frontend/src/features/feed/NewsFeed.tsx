@@ -1,2 +1,16 @@
-// Scaffold only; implementation has not started.
-// Person 1: source-linked filtered articles and selected-story events; synchronize IDs with map and show publication/coverage/verification metadata.
+import type { Article } from '@atlas/contracts';
+
+export function NewsFeed({ articles, selectedId, onSelect }: {
+  articles: readonly Article[]; selectedId: string | null; onSelect: (article: Article) => void;
+}) {
+  return <ol className="news-list">{articles.map(article => <li key={article.id} className={selectedId === article.id ? 'selected' : ''}>
+    <div className="article-meta">{article.publisher} · {article.published_at
+      ? new Date(article.published_at).toLocaleString(undefined, { timeZone: 'UTC', timeZoneName: 'short' })
+      : article.published_date ? `${article.published_date} (date only)` : 'Publication time unavailable'}</div>
+    <h3><button className="headline" aria-pressed={selectedId === article.id} onClick={() => onSelect(article)}>{article.title}</button></h3>
+    {article.excerpt && <p>{article.excerpt}</p>}
+    <p className="muted">{article.geographic_precision ?? 'Geography not verified'} · {article.verification_status}
+      {article.themes.length > 0 && ` · ${article.themes.join(', ')}`}</p>
+    <a href={article.url} target="_blank" rel="noopener noreferrer">Read original source <span aria-hidden="true">↗</span></a>
+  </li>)}</ol>;
+}

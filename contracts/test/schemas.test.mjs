@@ -5,6 +5,7 @@ import { Ajv } from 'ajv';
 import addFormats from 'ajv-formats';
 import { schemas } from '../dist/index.js';
 import { seedExamples } from '../scripts/seed-examples.mjs';
+import { apiExamples } from '../scripts/api-examples.mjs';
 
 const examples = JSON.parse(await readFile(new URL('../examples/helene-core.json', import.meta.url), 'utf8'));
 const ajv = new Ajv({ allErrors: false, strict: true, coerceTypes: false, removeAdditional: false });
@@ -22,11 +23,30 @@ const city = examples.locations.find(location => location.precision === 'city');
 const gauge = examples.locations.find(location => location.precision === 'facility');
 
 test('all public schemas compile, register by name, and resolve from another schema', () => {
-  assert.deepEqual(Object.keys(schemas).sort(), ['Article', 'Citation', 'CitationReference', 'Location', 'NewsQuery', 'Source']);
+  assert.deepEqual(Object.keys(schemas).sort(), ['ApiError', 'Article', 'Citation', 'CitationReference', 'Coverage', 'Location', 'LocationsQuery', 'LocationsResponse', 'NewsQuery', 'NewsResponse', 'Source']);
   for (const name of Object.keys(schemas)) assert.equal(typeof ajv.getSchema(name), 'function');
   const wrapper = ajv.compile({ type: 'object', properties: { article: { $ref: 'Article' } }, required: ['article'], additionalProperties: false });
   assert.equal(wrapper({ article: knownArticle }), true);
   assert.equal(wrapper({ article: { ...knownArticle, title: 7 } }), false);
+});
+
+test('shared historical API examples remain derived and validate complete envelopes', async () => {
+  const api = JSON.parse(await readFile(new URL('../examples/helene-api.json', import.meta.url), 'utf8'));
+  assert.deepEqual(api, await apiExamples());
+  valid('NewsResponse', api.news);
+  valid('NewsResponse', api.emptyNews);
+  valid('LocationsResponse', api.locations);
+  valid('Coverage', { mode: 'stored', live: false, scope: 'all', source_id: null, status: null, attempted_at: null,
+    last_successful_at: null, next_retry_at: null, consecutive_failures: null, verification_status: null,
+    feeds: [], datasets: [], articles: null });
+  invalid('NewsResponse', { ...api.news, total: 10 });
+  invalid('NewsResponse', { ...api.news, items: [{ ...api.news.items[0], published_at: 'yesterday' }] });
+  invalid('Coverage', { mode: 'stored', live: true });
+  invalid('Coverage', { mode: 'fixture', live: false, feeds: [{ arbitrary: 'field' }] });
+  valid('ApiError', { error: { code: 'CONTRACTS_UNAVAILABLE', message: 'Missing schema', retryable: true, request_id: 'req-1' } });
+  invalid('ApiError', { error: { code: 'INTERNAL_ERROR', message: 'Unavailable' } });
+  valid('LocationsQuery', { ids: ['loc-asheville-nc'], query: 'Asheville', limit: 100, offset: 0 });
+  invalid('LocationsQuery', { ids: 'loc-asheville-nc' });
 });
 
 test('plain JSON exports exactly match the TypeScript-authored schemas', async () => {

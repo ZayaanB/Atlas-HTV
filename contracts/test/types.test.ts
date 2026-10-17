@@ -2,7 +2,7 @@
 import { schemas } from '../index.js';
 import { Ajv } from 'ajv';
 import addFormats from 'ajv-formats';
-import type { Article, Citation, CitationReference, Contract, ContractMap, Location, NewsQuery, SchemaName, Source } from '../index.js';
+import type { ApiError, Article, Citation, CitationReference, Contract, ContractMap, Location, LocationsResponse, NewsQuery, NewsResponse, SchemaName, Source } from '../index.js';
 
 type Expect<T extends true> = T;
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -14,6 +14,10 @@ type _OptionalDate = Expect<Equal<Article['published_date'], string | null | und
 type _NullableSourceTime = Expect<Equal<Source['retrieved_at'], string | null>>;
 type _Citation = Expect<Equal<Citation, Contract<'Citation'>>>;
 type _QueryKeys = Expect<Equal<keyof NewsQuery, 'location_ids' | 'themes' | 'entity_ids' | 'bounds' | 'keyword' | 'semantic_query' | 'published_from' | 'published_to' | 'limit' | 'offset'>>;
+type _NewsArticle = Expect<Equal<NewsResponse['items'][number], Article>>;
+type _ResponseLocation = Expect<Equal<LocationsResponse['items'][number], Location>>;
+type _StoredNotLive = Expect<Equal<NewsResponse['coverage']['live'], false>>;
+type _RequestId = Expect<Equal<ApiError['error']['request_id'], string>>;
 
 const query: NewsQuery = { location_ids: ['loc-asheville-nc'], bounds: [-83, 35, -82, 36], limit: 20 };
 const citation: Citation = { source_id: 'src-usgs-alert-2024-09-30', record_id: 'art-usgs-alert-2024-09-30', url: 'https://water.usgs.gov/', title: 'USGS' };

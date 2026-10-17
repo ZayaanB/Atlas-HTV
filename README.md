@@ -4,11 +4,11 @@ Geographic news and evidence workspace with a Mapbox globe, satellite exploratio
 
 Product scope: [Final PRD](atlas_prd.md).
 
-## Scaffold status
+## Current status
 
-Structure only. TypeScript files contain planning comments, not implementation. No packages have been installed, no runnable scripts are provided, and no integrations are configured. Package manifests and TypeScript/build configuration will be added when implementation starts so placeholder files cannot be mistaken for a working app.
+The frontend foundation, core/news/location contracts, backend code, and data handoff files now exist. The frontend runs independently with explicitly labeled historical fixtures or connects through same-origin `/api`. Overall backend readiness remains incomplete: 16 required domain schemas and external setup are still outstanding. No live provider/database integration is claimed by this status.
 
-This is the **shared scaffold for all four people**. The human using this chat is **Person 3 — Backend and Gemini**; that does not limit the scaffold to backend work. Implementation is paused until a later explicit start instruction.
+This is the **shared scaffold for all four people**. The human using this chat is **Person 3 — Backend and Gemini**; that does not limit the scaffold to backend work. Person 1’s frontend foundation was explicitly authorized. Map rendering and the remaining feature UI are deferred; see [frontend startup and boundaries](frontend/README.md) and [Person 2 handoff](frontend/docs/map-handoff.md).
 
 Read [shared agent instructions](AGENTS.md) first, then the matching role guide:
 
@@ -28,10 +28,10 @@ Read [shared agent instructions](AGENTS.md) first, then the matching role guide:
 
 ## Layout
 
-- `frontend/`: comment-only entry, shell/state, feature components, API boundary, and styles for Persons 1 and 2.
-- `backend/`: comment-only API, service, and data placeholders; see [backend handoff](backend/README.md).
-- `contracts/`: shared API/schema/example slots owned by Person 1, agreed with Person 3.
-- `db/`: migration and seed/import definition slots owned by Person 4.
+- `frontend/`: runnable React/Vite shell, Zustand workspace state, TanStack Query news/location hooks, typed API boundary, feed, and a temporary map preview. Person 2’s map subtree remains placeholders.
+- `backend/`: Fastify API, retrieval, provider adapters, and operational tooling; see [backend handoff](backend/README.md) for setup and remaining dependencies.
+- `contracts/`: authoritative JSON Schemas, inferred TypeScript types, and historical examples owned by Person 1, matching Person 3’s existing protocol.
+- `db/`: migrations, database handoff, and historical seed definitions owned by Person 4; file presence does not establish deployment.
 - `assets/evidence/`: verified imagery/legends supplied by Person 4.
 - `scripts/`: import definitions and startup tooling, with ownership recorded before implementation.
 - `infra/`: Vultr/Caddy deployment supplied by Person 4.

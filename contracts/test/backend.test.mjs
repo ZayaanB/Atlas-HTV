@@ -9,10 +9,29 @@ import { loadHandoffs } from '../../backend/src/runtime/handoffs.ts';
 import { Contracts, normalizeQuery } from '../../backend/src/services/validation.ts';
 import { normalizeArticle } from '../../backend/src/data/ingestion.ts';
 import { EvidenceLedger } from '../../backend/src/services/gemini/citations.ts';
+import { Retrieval } from '../../backend/src/services/retrieval.ts';
 import { schemas } from '../dist/index.js';
 
 const examples = JSON.parse(await readFile(new URL('../examples/helene-core.json', import.meta.url), 'utf8'));
 const contracts = new Contracts(schemas);
+
+test('existing retrieval emits news/location responses accepted by the shared envelopes', async () => {
+  const retrieval = new Retrieval(contracts, { mode: 'fixture', async read(name) {
+    if (name === 'news') return examples.articles;
+    if (name === 'locations') return examples.locations;
+    if (name === 'freshness') return [{ scope: 'all', source_id: null, status: null, attempted_at: null,
+      last_successful_at: null, next_retry_at: null, consecutive_failures: null, verification_status: null,
+      feeds: [], datasets: [], articles: null }];
+    throw new Error(`Unexpected repository operation ${name}`);
+  } });
+  const news = await retrieval.news({ limit: 50, offset: 0 });
+  assert.equal(news.items.length, 10);
+  assert.equal(news.coverage.mode, 'fixture');
+  const locations = await retrieval.locations({ ids: [examples.locations[0].id] });
+  assert.deepEqual(locations.items, [examples.locations[0]]);
+  const empty = await retrieval.news({ keyword: 'zz-no-match' });
+  assert.deepEqual(empty.items, []);
+});
 
 test('existing backend loader imports the compiled module and preserves partial readiness', async () => {
   const handoff = await loadHandoffs(readConfig({ ATLAS_CONTRACTS_MODULE: 'contracts/dist/index.js' }));
@@ -55,7 +74,7 @@ test('existing citation ledger resolves original sources and rejects unsupported
   assert.throws(() => ledger.resolve([{ source_id: source.id, record_id: article.id, url: 'https://example.invalid/forged' }], contracts), /does not match/);
 });
 
-test('backend configuration checker reports the five supplied contracts and remaining setup honestly', () => {
+test('backend configuration checker reports supplied contracts and remaining setup honestly', () => {
   const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/check.ts'], {
     cwd: fileURLToPath(new URL('../../backend/', import.meta.url)), encoding: 'utf8', timeout: 15000,
     // Do not inherit credentials or load .env. This checker imports local handoffs only.
@@ -65,8 +84,8 @@ test('backend configuration checker reports the five supplied contracts and rema
   assert.equal(result.status, 2, result.stderr);
   const report = JSON.parse(result.stdout);
   assert.equal(report.contracts.complete, false);
-  assert.equal(report.contracts.missing.length, 19);
-  for (const name of ['NewsQuery', 'Article', 'Location', 'Source', 'Citation']) assert.equal(report.contracts.missing.includes(name), false);
+  assert.equal(report.contracts.missing.length, 16);
+  for (const name of ['NewsQuery', 'NewsResponse', 'LocationsQuery', 'LocationsResponse', 'Article', 'Location', 'Source', 'Citation']) assert.equal(report.contracts.missing.includes(name), false);
   assert.deepEqual(report.database.missing_plans, []);
   assert.equal(report.database.credentials_configured, false);
   assert.equal(report.live_connections_verified, false);

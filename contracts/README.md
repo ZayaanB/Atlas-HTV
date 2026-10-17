@@ -1,8 +1,8 @@
-# Shared core contracts — Person 1
+# Shared contracts — Person 1
 
 One authoritative JSON Schema draft-07 set for frontend and backend. `schemas/*.ts` contains plain, serializable schema definitions; `index.ts` exports the backend-compatible `schemas` registry and types inferred with `json-schema-to-ts`. There are no separately maintained frontend/backend interfaces or validators.
 
-This is the authorized **core-contract slice**, not the complete API. Backend, database, and map implementations are unchanged. Zustand, TanStack Query, and feature UI are deferred.
+This includes the authorized core-contract and frontend-foundation slices, not the complete API. Frontend consumers use Zustand and TanStack Query; backend/database/map implementations remain unchanged by this slice.
 
 ## Available contracts
 
@@ -14,6 +14,8 @@ This is the authorized **core-contract slice**, not the complete API. Backend, d
 | `Source` | The original reporting, dataset, imagery, or government record, including publication, licensing, attribution and retrieval metadata. |
 | `Citation` | A resolved citation: `source_id`, `record_id`, original `url`, `title`. |
 | `CitationReference` | An unresolved reference: `source_id`, `record_id` only. Supporting definition, not a new endpoint. |
+
+Additional foundation contracts: `LocationsQuery`, `NewsResponse`, `LocationsResponse`, `Coverage`, and `ApiError`. Responses embed the authoritative Article/Location definitions. Coverage mirrors the existing database freshness projection, including nullable source-scope fields, per-feed state, datasets, and stored-corpus counts; it never supplies a matching-result total. Coverage always carries `mode` and `live:false`; absent freshness rows may omit other metadata. HTTP failures preserve the backend's `{error:{code,message,retryable,request_id}}` envelope.
 
 ## Build and checks
 
@@ -30,9 +32,9 @@ Build outputs are ignored by Git and must be rebuilt after schema changes:
 
 - `contracts/dist/index.js`: portable ESM exporting `schemas`; no runtime dependency imports.
 - `contracts/dist/index.d.ts`: schema-derived TypeScript exports, including `SchemaName`, `ContractMap`, and `Contract<Name>`.
-- `contracts/dist/schemas/{NewsQuery,Article,Location,Source,Citation,CitationReference}.json`: self-contained JSON Schemas generated from the same definitions. Do not edit or copy them into another workstream.
+- `contracts/dist/schemas/*.json`: self-contained JSON Schemas generated for every exported name from the same definitions. Do not edit or copy them into another workstream.
 
-The package exports both its root module and `@atlas/contracts/schemas/Article.json` (and the other named JSON files). A future frontend package can depend on `@atlas/contracts` via `file:../contracts`; build this package first. Type inference is type-only; `json-schema-to-ts` remains a package dependency because the exported declarations reference it.
+The package exports its root module, `@atlas/contracts/schemas/Article.json` (and the other named JSON files), and `@atlas/contracts/examples/helene-api.json`. The frontend depends on `@atlas/contracts` via `file:../contracts`; build this package first. Type inference is type-only; `json-schema-to-ts` remains a package dependency because the exported declarations reference it.
 
 ```ts
 import { schemas } from '@atlas/contracts';
@@ -83,7 +85,7 @@ npm --prefix contracts run test:backend
 
 These checks import the actual backend loader, query normalizer, article normalizer, and citation ledger. They also run its configuration checker with a sanitized environment and no `.env` file. They open no database connection and call no providers.
 
-**Partial readiness is intentional.** Five of the backend's 24 required schemas are supplied; `CitationReference` is an additional supporting definition. Its configuration check still reports **19 missing schemas**, and data routes requiring response/envelope schemas remain unavailable. No permissive schemas are added to make the backend report ready.
+**Partial readiness is intentional.** Eight of the backend's 24 required schemas are supplied; `CitationReference`, `Coverage`, and `ApiError` are supporting definitions. Its configuration check still reports **16 missing schemas**. News/location retrieval now has the necessary schemas, but actual API success depends on backend/database setup; overall readiness remains incomplete. No permissive schemas are added to make the backend report ready.
 
 ## Field conventions and boundaries
 
@@ -98,4 +100,4 @@ These checks import the actual backend loader, query normalizer, article normali
 - Citation grounding, known-ID resolution, source–record relationships, filter execution, provider rights and SQL remain Person 3/Person 4 responsibilities. No network fetch policy is implemented by these schemas.
 - Schema `$id` values use the reserved `atlas.invalid` namespace as identifiers, never as URLs to fetch. Register the local schemas before compiling references.
 
-See [shared examples](examples/README.md) for seed provenance and regeneration. Future response/envelope, investigation, evidence, observation and action schemas belong here when separately implemented; consumers must not create private replacements.
+See [shared examples](examples/README.md) for seed provenance and regeneration. Future investigation, evidence, observation and action schemas belong here when separately implemented; consumers must not create private replacements.

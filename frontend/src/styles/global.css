@@ -1,1 +1,56 @@
-/* Scaffold only. Person 1 owns shared design tokens, layout, contrast, responsive behavior, and reduced-motion styles. No CSS rules yet. */
+:root { font-family: system-ui, sans-serif; color: #dce5e9; background: #101b27; font-synthesis: none; line-height: 1.55; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select { font: inherit; }
+button, select { cursor: pointer; }
+button { background: #d5e7b5; color: #182524; border: 1px solid transparent; border-radius: 5px; padding: .55rem .8rem; }
+button:hover:not(:disabled) { filter: brightness(1.1); }
+button:disabled { cursor: default; opacity: .45; }
+button.secondary { background: transparent; border-color: #536673; color: #dce5e9; }
+button[aria-pressed='true'] { outline: 2px solid #d5e7b5; outline-offset: 3px; }
+:focus-visible { outline: 3px solid #f2cc7e; outline-offset: 3px; }
+a { color: #c7df9f; text-underline-offset: 4px; }
+input, select { color: #eaf0f2; background: #172837; border: 1px solid #526572; border-radius: 5px; padding: .6rem; min-width: 0; }
+input { width: 100%; }
+label { display: block; font-size: .85rem; margin: .6rem 0 .3rem; }
+h1, h2, h3, p { margin-top: 0; }
+h1, h2 { font-family: Georgia, serif; font-weight: 400; line-height: 1.12; }
+h1 { font-size: clamp(2.5rem, 4vw, 4rem); margin-bottom: 1.2rem; }
+h2 { font-size: 2.25rem; }
+h3 { font-size: 1.1rem; line-height: 1.4; margin: .45rem 0; }
+.masthead { display: flex; justify-content: space-between; align-items: center; padding: 1.2rem 2rem; border-bottom: 1px solid #344653; }
+.brand { font-weight: 700; letter-spacing: .24em; font-size: 1.5rem; }
+.tagline { color: #adbdc6; margin-left: 1.5rem; font-size: .85rem; }
+.edition, .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .7rem; color: #b9c99f; }
+.eyebrow { display: block; margin-bottom: .8rem; }
+.fixture-banner { padding: .7rem 2rem; background: #443d25; color: #ffe7a6; border-bottom: 1px solid #796844; font-size: .9rem; }
+.workspace { display: grid; grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); }
+.feed-panel { border-right: 1px solid #344653; padding: 2rem; }
+.context-panel { padding: 1.5rem 2rem; }
+.input-row { display: flex; gap: .5rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0; }
+.chips button { font-size: .75rem; background: #243e46; color: #dce5e9; overflow-wrap: anywhere; text-align: left; }
+.feed-summary { margin-top: 1.5rem; font-size: .9rem; }
+.muted, .article-meta, .coverage { color: #b0c0ca; font-size: .8rem; }
+.news-list { list-style: none; margin: 0; padding: 0; }
+.news-list > li { padding: 1.4rem 0; border-top: 1px solid #344653; }
+.news-list > li.selected { border-left: 3px solid #d5e7b5; padding-left: .8rem; }
+.headline { background: none; color: #f0f3ed; text-align: left; border: 0; padding: 0; font-size: inherit; font-weight: 600; }
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 1rem 0; font-size: .75rem; }
+.coverage { border-top: 1px solid #344653; padding-top: 1rem; }
+.coverage p { margin: .5rem 0; }
+.map-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; }
+.map-toolbar label { margin: 0; }
+.map-preview { min-height: 380px; padding: clamp(1.5rem, 4vw, 3.5rem); border: 1px solid #385361; background: radial-gradient(ellipse at top right, #28454c, #162a38 65%); border-radius: 8px; }
+.map-preview > p { max-width: 42rem; color: #bacbd2; }
+.places, .place-results { list-style: none; padding: 0; }
+.places li { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: 1rem 0; }
+.places small { display: block; text-align: left; }
+.places .secondary, .place-results button { font-size: .8rem; }
+.place-results button { margin: .3rem 0; }
+.selection-context { margin-top: 1.5rem; border-top: 1px solid #536673; padding-top: 1.5rem; }
+.error { border: 1px solid #ce9b7c; padding: 1rem; margin: 1rem 0; color: #ffdcc8; }
+.coordinate-readout { font-size: .85rem; padding: 1rem; background: #1c3440; }
+@media (min-width: 1000px) { .context-panel { position: sticky; top: 0; align-self: start; } }
+@media (max-width: 760px) { .workspace { display: flex; flex-direction: column; } .feed-panel { border-right: 0; } .context-panel { order: -1; } .tagline, .edition { display: none; } .masthead, .feed-panel, .context-panel { padding: 1.2rem; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
