@@ -26,3 +26,12 @@ test('recursive and unknown references fail without network fetching',()=>{
   assert.throws(()=>modelParameters(contracts,'Missing'),/unresolved/);
   assert.throws(()=>modelParameters(contracts,'Absent'),/has not been supplied/);
 });
+test('model hints omit cumulative array maxima while shared runtime still rejects oversized lists',()=>{
+  const schema={type:'object',properties:{ids:{type:'array',items:{type:'string'},maxItems:3}},required:['ids'],additionalProperties:false};
+  const contracts=new Contracts({List:schema});
+  const projected=modelParameters(contracts,'List');
+  assert.equal((projected.properties as Record<string,Record<string,unknown>>).ids!.maxItems,undefined);
+  assert.equal(schema.properties.ids.maxItems,3);
+  assert.throws(()=>contracts.parse('List',{ids:['a','b','c','d']}),/Invalid List/);
+  assert.deepEqual(contracts.parse('List',{ids:['a','b','c']}),{ids:['a','b','c']});
+});

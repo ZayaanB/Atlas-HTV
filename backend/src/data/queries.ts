@@ -1,7 +1,8 @@
 import type pg from 'pg';
 import { AppError, checkAbort, unavailable } from '../runtime/errors.js';
 import type { Data } from '../services/validation.js';
-export const reads = ['news', 'locations', 'investigation', 'observations', 'sources', 'semantic_news', 'freshness', 'embedding_chunks'] as const;
+import { workspacePlan } from './workspace.js';
+export const reads = ['news', 'locations', 'investigation', 'observations', 'sources', 'semantic_news', 'freshness', 'embedding_chunks', 'workspace'] as const;
 export type Read = typeof reads[number];
 export const corePlans: Read[] = ['news','locations','investigation','observations','sources','freshness'];
 export interface Repository {
@@ -37,7 +38,7 @@ export class PgRepository implements Repository {
   }
   get missingPlans() { return corePlans.filter(name => !Object.hasOwn(this.handoff.plans,name)); }
   private plan(name: keyof DatabaseHandoff['plans'], input: Data) {
-    const plan = this.handoff.plans[name];
+    const plan = this.handoff.plans[name] ?? (name === 'workspace' ? workspacePlan : undefined);
     if (!plan) throw unavailable('SCHEMA_HANDOFF_UNAVAILABLE', `Database query ${name} awaits the frozen schema handoff`);
     return { text: plan.text, values: plan.parameters.map(key => input[key] ?? null) };
   }

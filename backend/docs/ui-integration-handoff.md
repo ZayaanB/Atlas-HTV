@@ -1,5 +1,7 @@
 # UI/backend integration — 2026-10-17
 
+**Superseded by the main `9b592cd` integration:** all core schemas now load, `/api/workspace` discovers explicit investigation/article links and filter labels, and real Tiger-backed investigation/timeline reads plus Gemini cited answers pass. See [current integration and test steps](gemini-integration.md). The earlier checks below are historical evidence, not the current missing-dependency list.
+
 Pulled `origin/main` through `e6eeb59` into `feat/zayaan/backend-live-setup` with a fast-forward. Existing uncommitted backend work, private environment and the user's certificate file were preserved. No teammate source files were edited, and no commits/pushes were performed.
 
 ## Verified against the actual database
