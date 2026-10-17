@@ -4,6 +4,8 @@ import { Retrieval, matchesNews } from '../src/services/retrieval.js';
 import { Tools } from '../src/services/gemini/tools.js';
 import { bounds, range, normalizeQuery } from '../src/services/validation.js';
 import { protocolArticle, testContracts, TestRepository } from './support.js';
+import type { Read } from '../src/data/queries.js';
+import type { Data } from '../src/services/validation.js';
 test('manual/tool news share exact filtering including fractional UTC timestamps, null publication and keyword',async () => {
   const contracts = testContracts(), repository = new TestRepository({news:[protocolArticle('test-a'),protocolArticle('test-b',{location_ids:['elsewhere']}),protocolArticle('test-c',{published_at:null})]});
   const retrieval = new Retrieval(contracts,repository), tools = new Tools(contracts,retrieval);
@@ -28,6 +30,35 @@ test('bounds preserve broad precision rather than matching an invented local pin
   const repository = new TestRepository({news:[protocolArticle()],locations:[{id:'test-place',name:'Synthetic region',precision:'region',coordinates:[0,0],bounds:[-10,-10,10,10]}]});
   const retrieval = new Retrieval(testContracts(),repository);
   assert.deepEqual((await retrieval.news({bounds:[-1,-1,1,1]})).items,[]);
+});
+test('area search retains matching articles beyond the default location page and across ID batches',async () => {
+  class PagedLocations extends TestRepository {
+    override async read(name: Read,input: Data) {
+      const rows=await super.read(name,input);
+      if (name!=='locations') return rows;
+      const requested=new Set(input.ids as string[]);
+      return rows.filter(row => requested.has(String(row.id))).slice(Number(input.offset),Number(input.offset)+Number(input.limit));
+    }
+  }
+  for (const [articleCount,placesPerArticle] of [[75,1],[51,3]] as const) {
+    const articles=Array.from({length:articleCount},(_,index) => protocolArticle(`test-article-${index}`,{
+      location_ids:Array.from({length:placesPerArticle},(_,place) => `test-place-${index}-${place}`)
+    }));
+    const places=articles.flatMap(article => (article.location_ids as string[]).map(id => ({id,name:'Synthetic point',precision:'facility',coordinates:[0,0]})));
+    const repository=new PagedLocations({news:articles,locations:places});
+    const retrieval=new Retrieval(testContracts(),repository),tools=new Tools(retrieval.contracts,retrieval);
+    const query={bounds:[-1,-1,1,1],limit:100};
+    const manual=await retrieval.news(query);
+    assert.deepEqual(manual.items,articles);
+    assert.deepEqual(await tools.dispatch('search_news',query),manual);
+    assert.ok(repository.calls.filter(call => call.name==='locations').every(call => (call.input.ids as string[]).length>0 && (call.input.ids as string[]).length<=100));
+  }
+});
+test('an empty area result never triggers an unrestricted location query',async () => {
+  const repository=new TestRepository({news:[]});
+  const result=await new Retrieval(testContracts(),repository).news({bounds:[-1,-1,1,1]});
+  assert.deepEqual(result.items,[]);
+  assert.equal(repository.calls.some(call => call.name==='locations'),false);
 });
 test('semantic fallback is disclosed and preserves strict filters',async () => {
   const retrieval = new Retrieval(testContracts(),new TestRepository({news:[protocolArticle('test-a'),protocolArticle('test-b',{location_ids:['elsewhere']})]}));

@@ -2,9 +2,9 @@
 
 Implementation is authorized for this workstream. This directory now contains a runnable Node.js/TypeScript/Fastify server, canonical retrieval services, official Google Gen AI SDK orchestration/embeddings, a TLS `pg` adapter, provider adapters, manual import/indexing entrypoints, and behavioral tests. All changes are confined to `backend/`.
 
-**Current runtime:** liveness works without credentials. Readiness returns 503 and data routes fail with an explicit missing-contract/setup error until the shared contracts and frozen database handoff are supplied. The repository's `contracts/`, migrations, source definitions, and seeds were comment-only when this implementation began. No factual development dataset has been invented. Test data and model responses are synthetic protocol doubles, used only by tests.
+**Current runtime (2026-10-17):** the merged authoritative contract module is built and loaded, all 11 frozen SQL plans load from `db/handoff/database.mjs`, and four reviewed source definitions plus one bounded flight region load. News/location APIs return real stored records from the existing Tiger DEV service. Sixteen required schemas for investigations, observations, assistant/actions and flights are still missing, so full readiness remains 503. Person 4's curated Helene seed is loaded: 10 articles, 7,467 observations and one investigation. This is historical data, not a live feed. Test data/model responses are synthetic protocol doubles used only by tests.
 
-No real Gemini request, Tiger Cloud query, news import, embedding generation, or flight request has been executed. The agent has not run migrations, provisioned resources, deployed, committed, or pushed. Implemented adapters are not evidence of completed sponsor integrations.
+The configured Gemini key/model passed a real metadata-only probe. Tiger's TLS verification passed with the user-supplied certificate file; migrations 001–005, reviewed runtime grants and the committed seed were applied to existing DEV service `apzql812ni`. Backend `.env` contains only the least-privilege runtime database connection and retains the existing Gemini settings. Generation, embeddings, provider news imports and flights have not been called. No provisioning, deployment, commits or pushes were performed.
 
 ## Run locally
 
@@ -12,7 +12,10 @@ Requires Node >=22.12 (verified with Node 24.14). From the repository root:
 
 ```bash
 npm --prefix backend ci
-cp backend/.env.example backend/.env
+npm --prefix contracts ci
+npm --prefix contracts run build
+# Only on a fresh checkout without a populated secret file:
+test -e backend/.env || (umask 077; cp backend/.env.example backend/.env)
 npm --prefix backend run dev
 ```
 
@@ -34,6 +37,8 @@ npm --prefix backend start
 `npm --prefix backend run check` validates environment and handoff exports locally, lists missing shared schemas/core query plans, and reports whether credentials are configured. It opens no database connection and calls no provider. Exit codes: 0 means data configuration is complete, 2 means required setup is missing, and 1 means configuration is invalid. Configured means available for a later live check, not verified access. Blank/whitespace settings, inconsistent embedding configuration, malformed query plans, duplicate source/region IDs, missing modules and modules outside their owned paths fail with safe diagnostics. Integration modules must be portable `.mjs` or built `.js` files.
 
 `verify:connections` is a separate explicit read-only network check that works without teammate schemas: it verifies PostgreSQL session TLS and reads installed extension names, and fetches Gemini model metadata. Use `-- --database` or `-- --gemini` to select one check. It does not apply migrations, import records, generate embeddings, or generate answers. Success verifies the selected connection/metadata only, not the Atlas schema, generation quota, tool calling, or grounded answers. Its exit codes are 0 (selected probes passed), 2 (missing configuration), and 1 (invalid configuration/failed probe). Raw errors and credential values are never printed.
+
+The explicit `setup:tiger` command connects to an existing READY DEV service using authenticated Tiger CLI password storage. By default it only checks the completed schema and saves a verified `atlas_runtime` connection. `--initialize` applies the committed Person 4 migrations 001–005, runtime grants and curated seed when the database is empty. It resumes only a contiguous known migration history, refuses conflicting Atlas schemas/partial seed data, preserves existing role passwords, and never provisions or drops a database. Admin credentials stay out of `.env`; generated runtime credentials are saved privately before subsequent checks so retries do not lose them. See the [step-by-step setup guide](docs/credentials-setup.md) before running it.
 
 ## What is implemented
 
@@ -70,16 +75,16 @@ curl http://127.0.0.1:3001/api/assistant -H 'Content-Type: application/json' \
   -d '{"request_id":"ui-request-1","message":"Explain the available evidence","timezone":"America/Toronto","filters":{},"allow_ui_actions":false}'
 ```
 
-The identifiers above are placeholders, not invented source records. An actual response currently obtainable with no setup is:
+The generic identifiers above are placeholders. This checkout's initialized database supports `location_ids=loc-asheville-nc` and `query=Asheville`; the sourced investigation ID is `inv-helene-asheville-2024`, but its route still awaits the shared investigation schemas. Current readiness reports:
 
 ```json
-{"status":"not_ready","contracts":false,"database":false,"query_plans":false,"data_mode":"unavailable"}
+{"status":"not_ready","contracts":false,"database":true,"query_plans":true,"data_mode":"stored"}
 ```
 
 The consistent operational error envelope is:
 
 ```json
-{"error":{"code":"CONTRACTS_UNAVAILABLE","message":"Shared schema NewsQuery has not been supplied","retryable":true,"request_id":"SERVER_REQUEST_ID"}}
+{"error":{"code":"CONTRACTS_UNAVAILABLE","message":"Shared schema InvestigationQuery has not been supplied","retryable":true,"request_id":"SERVER_REQUEST_ID"}}
 ```
 
 Assistant responses echo the client `request_id`. Person 1 must abort obsolete fetches and discard any response whose request ID is no longer active **before applying actions**. `allow_ui_actions` defaults to false; explicitly enable it for a workspace-changing request. Valid action types are `set_filters` with a complete filters object and `focus_location` with a known location ID; backend never invents camera coordinates/zoom. Focus precision comes from the shared Location record. Failed, cancelled or rejected synthesis produces no actions. Read-only tool searches inherit active location/theme/entity/bounds/publication constraints and cannot silently replace them; changing these requires `set_filters`.
@@ -101,10 +106,14 @@ Indexing reads an explicitly permitted stored chunk, compares hash/model/version
 
 ## Validation and remaining integration work
 
-Verified in this checkout: **60 behavioral tests passed**, including rate-limit/deadline regressions, cancellation of late model responses, stalled-provider shutdown, malformed provider/handoff rejection, and a separate server process that serves liveness and exits cleanly on SIGTERM. TypeScript checks passed for source/tests, the production build passed, and the local configuration checker and read-only connection checker accurately report incomplete setup with exit code 2. Connection-check tests cover TLS/extension reporting, metadata-only Gemini probing, timeouts, cleanup and redacted diagnostics using injected clients; no live credentials have been verified. Earlier built-server smoke checks returned liveness 200, readiness 503 and a structured missing-contract 503 for news. `git diff --check` passed; changes remain within `backend/`.
+**71 backend tests pass**, including rate-limit/deadline regressions, cancellation of late model responses, stalled-provider shutdown, malformed provider/handoff rejection, and a separate server process that serves liveness and exits cleanly on SIGTERM. TypeScript checks and production build pass. Tiger setup tests cover URI/TLS overrides, private environment preservation, migration conflicts, password-file escaping, explicit initialization, production/unready service rejection, TLS failure redaction and runtime verification/cleanup. Area-search regressions verify more than 50 locations and multiple ID batches without dropping matching articles, manual/tool parity, and no unrestricted location lookup for empty results. The current local configuration checker loads real handoffs and reports incomplete setup with exit code 2.
+
+Real read-only API checks passed for Asheville location lookup, location-filtered news (5 results), location+`water` filtering (3 results), publication-range filtering (6 results), and oversized-limit rejection (400). Coverage preserves `mode: "stored"`, `live: false`, units and source/dataset timestamps. Database catalogs confirm verified TLS and installed TimescaleDB/pgvector; runtime login/read checks pass, with 10 articles, 7,467 observations and one investigation. Gemini metadata access is verified. Investigation returns the expected explicit missing-schema 503. No real generated answer, timeline API result, ingestion or flight integration is claimed.
+
+After fast-forwarding to UI integration commit `e6eeb59`, the browser loaded all 10 stored articles through Vite's same-origin `/api` proxy. Keyword `water` returned 4; selecting Asheville retained 3 and resolved its sourced city extent. A proxied area query `bounds=-83,35,-82,36&limit=100` returned 10 stored articles with `live:false`. The user-supplied public Mapbox token is configured in ignored `frontend/.env.local`; globe rendering, feed-driven focus to Asheville and the Auto transition to satellite were visually verified, with the sourced city extent and streamgage overlay restored. Satellite basemap remains context, not dated event evidence. The frontend build passes; its tests report 14 passes and one stale preview expectation after Mapbox replaced that preview. See [UI integration handoff](docs/ui-integration-handoff.md) for exact remaining owner tasks.
 
 Tests cover manual/tool filter parity, timestamp/bounds handling, validation, citation/source relationships, UI-action rejection, timeout/cancellation, tool limits, redaction, parameter binding/transaction rollback, embedding identity/fallback, import normalization/deduplication/permissions/failures, provider payloads and size limits, and flight cache/coalescing/backoff/expiry. They use synthetic dependencies plus a temporary localhost server, and do not contact external providers. A failed rollback discards the affected pool client while preserving the original write error.
 
-To finish the real vertical slice, supply the authoritative runtime schemas, a frozen database schema/query handoff, TLS database credentials, one verified source-linked investigation and observation series, an available Gemini model/key, and reviewed source/flight configuration. Then run the migrations/imports with Person 4's authorization, verify real filtered queries and timeline, make a real cited Gemini call, and record integration evidence. None of those live validations is claimed by the current test suite.
+To finish the sourced assistant/timeline vertical slice, receive the remaining shared schemas from Person 1, then verify investigation/timeline retrieval and make a real cited Gemini call. Flight activation still requires provider/polling review and the shared flight schemas. The initialized Tiger database and existing Gemini metadata access are ready for that integration.
 
 References used for adapter behavior: [official Gen AI SDK](https://googleapis.github.io/js-genai/release_docs/index.html), [Fastify](https://fastify.dev/docs/latest/Reference/Validation-and-Serialization/), [node-postgres TLS](https://node-postgres.com/features/ssl), [GDELT DOC](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/), [ADSB.lol API/terms](https://api.adsb.lol/docs), [readsb v2 timestamp format](https://github.com/wiedehopf/readsb/blob/dev/README-json.md). Dependency versions are pinned in the backend manifest/lockfile. No current polling guarantee is assumed from the ADSB.lol documentation.
