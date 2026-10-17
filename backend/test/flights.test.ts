@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readConfig } from '../src/config.js';
 import { Flights } from '../src/services/flights.js';
 import { AdsbLol } from '../src/data/providers/adsblol.js';
-import { testContracts } from './support.js';
+import { deferred, testContracts } from './support.js';
 const region = {id:'test-region',latitude:0,longitude:0,radius_nm:10};
 test('concurrent viewers coalesce, global polling is bounded and old samples are marked stale',async () => {
   let now = Date.parse('2026-01-01T00:00:00Z'), calls = 0;
@@ -51,4 +51,34 @@ test('ADSB v2 milliseconds, seen_pos, units and geographic bounds are normalized
   assert.equal(items.length,1); assert.equal(items[0]!.observed_at,new Date(now-3000).toISOString());
   assert.deepEqual(items[0]!.coordinates,[0,0]); assert.equal(items[0]!.altitude,null); assert.equal(items[0]!.speed_unit,'kn');
   await assert.rejects(provider.region({...region,radius_nm:101}),/1–100/);
+});
+test('cancelling one viewer keeps the coalesced sample request available to another',async () => {
+  const sample = deferred<import('../src/services/validation.js').Data[]>(), entered = deferred<void>();
+  let calls = 0;
+  const flights = new Flights(testContracts(),readConfig({NODE_ENV:'test',FLIGHTS_ENABLED:'true'}),[region],{region:async () => {
+    calls++; entered.resolve(); return sample.promise;
+  }});
+  const controller = new AbortController();
+  const first = flights.get({region_id:region.id},controller.signal);
+  await entered.promise;
+  const second = flights.get({region_id:region.id});
+  controller.abort(); await assert.rejects(first,/cancelled/);
+  sample.resolve([]); assert.deepEqual((await second).items,[]); assert.equal(calls,1);
+  await flights.close();
+});
+test('flight shutdown aborts a stalled provider and rejects further requests', {timeout:2000},async () => {
+  let signal: AbortSignal | undefined; const entered = deferred<void>();
+  const flights = new Flights(testContracts(),readConfig({NODE_ENV:'test',FLIGHTS_ENABLED:'true'}),[region],{region:async (_region,providerSignal) => {
+    signal = providerSignal; entered.resolve(); return new Promise(() => {});
+  }});
+  const result = assert.rejects(flights.get({region_id:region.id}),/No flight sample/);
+  await entered.promise; await flights.close(); await result;
+  assert.equal(signal?.aborted,true);
+  await assert.rejects(flights.get({region_id:region.id}),/closing/);
+});
+test('invalid aircraft identifiers are rejected before spending a provider request',async () => {
+  let called = false;
+  const flights = new Flights(testContracts(),readConfig({NODE_ENV:'test',FLIGHTS_ENABLED:'true'}),[region],{region:async () => {called = true; return [];}});
+  await assert.rejects(flights.find({region_id:region.id,identifier:'https://bad.invalid'}),/aircraft ID/);
+  assert.equal(called,false); await flights.close();
 });

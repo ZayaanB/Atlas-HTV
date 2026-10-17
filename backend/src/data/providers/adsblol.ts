@@ -1,19 +1,18 @@
 import { AppError } from '../../runtime/errors.js';
-import { Contracts, type Data, object, publicUrl, records, string } from '../../services/validation.js';
-import { readResponse, type Fetch } from './http.js';
+import { Contracts, type Data, publicUrl, records, string } from '../../services/validation.js';
+import { fetchText, jsonObject, type Fetch } from './http.js';
 export class AdsbLol {
   constructor(private contracts: Contracts, private timeoutMs: number, private fetcher: Fetch = fetch, private clock = Date.now) {}
-  async region(raw: Data): Promise<Data[]> {
+  async region(raw: Data, signal?: AbortSignal): Promise<Data[]> {
     const region = this.contracts.parse('FlightRegion', raw);
     const latitude = Number(region.latitude), longitude = Number(region.longitude), radius = Number(region.radius_nm);
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || !Number.isInteger(radius) || radius < 1 || radius > 100)
       throw new AppError('INVALID_REGION', 'Flight regions must have valid coordinates and a radius of 1–100 nautical miles');
-    const response = await this.fetcher(`https://api.adsb.lol/v2/point/${latitude}/${longitude}/${radius}`, {
-      signal: AbortSignal.timeout(this.timeoutMs), redirect: 'error', headers: { accept: 'application/json' }
-    });
-    const payload = object(JSON.parse(await readResponse(response)));
+    const payload = jsonObject(await fetchText(this.fetcher,`https://api.adsb.lol/v2/point/${latitude}/${longitude}/${radius}`, {
+      signal: AbortSignal.any([AbortSignal.timeout(this.timeoutMs),...(signal ? [signal] : [])]), redirect: 'error', headers: { accept: 'application/json' }
+    }));
     const fetched = this.clock();
-    if (!Array.isArray(payload.ac)) throw new AppError('INVALID_FLIGHT_DATA','Provider did not return an aircraft list',502);
+    if (!Array.isArray(payload.ac) || payload.ac.some(row => !row || typeof row !== 'object' || Array.isArray(row))) throw new AppError('INVALID_FLIGHT_DATA','Provider did not return an aircraft list',502);
     const now = Number(payload.now);
     if (!Number.isFinite(now)) throw new AppError('INVALID_FLIGHT_DATA', 'Missing provider observation epoch', 502);
     // The v2 (jv2) envelope uses Unix milliseconds; seen_pos uses seconds.

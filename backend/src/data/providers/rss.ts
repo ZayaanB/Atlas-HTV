@@ -1,8 +1,8 @@
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { isIP } from 'node:net';
 import { AppError } from '../../runtime/errors.js';
 import { type Data, object, records, string, publicUrl } from '../../services/validation.js';
-import { readResponse, type Fetch } from './http.js';
+import { fetchText, type Fetch } from './http.js';
 export function feedUrl(value: unknown): string {
   const url = new URL(publicUrl(value));
   if (isIP(url.hostname.replace(/^\[|\]$/g,'')) || !url.hostname.includes('.') || /(?:^|\.)(localhost|local|internal|test|invalid)$/.test(url.hostname) || (url.port && url.port !== '443'))
@@ -10,6 +10,7 @@ export function feedUrl(value: unknown): string {
   return url.href;
 }
 function plain(value: unknown, max: number): string {
+  if (value && typeof value === 'object' && !Array.isArray(value)) value = object(value)['#text'];
   return string(value).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,max);
 }
 export class Rss {
@@ -18,15 +19,23 @@ export class Rss {
     if (definition.permitted !== true || !string(definition.license_url)) throw new AppError('SOURCE_NOT_PERMITTED','RSS feed requires recorded permission and license/terms reference');
     if (definition.excerpts_permitted === true && (!Number.isInteger(definition.max_excerpt_chars) || Number(definition.max_excerpt_chars) < 1 || Number(definition.max_excerpt_chars) > 500))
       throw new AppError('SOURCE_DEFINITION_INVALID','Permitted RSS excerpts require a character bound of 1–500');
-    const response = await this.fetcher(feedUrl(definition.url), {redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(this.timeoutMs),...(signal ? [signal] : [])])});
-    const xml = await readResponse(response,1000000);
+    const xml = await fetchText(this.fetcher,feedUrl(definition.url), {redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(this.timeoutMs),...(signal ? [signal] : [])])},1000000);
     if (/<!DOCTYPE|<!ENTITY/i.test(xml)) throw new AppError('INVALID_XML','XML entities and document types are rejected',502);
-    const document = object(new XMLParser({ignoreAttributes:false,processEntities:false}).parse(xml));
-    const rawItems = document.rss ? object(object(document.rss).channel).item : object(document.feed ?? {}).entry;
-    const items = rawItems === undefined ? [] : Array.isArray(rawItems) ? records(rawItems) : [object(rawItems)];
+    if (XMLValidator.validate(xml) !== true) throw new AppError('INVALID_XML','Provider returned malformed XML',502);
+    const document = object(new XMLParser({ignoreAttributes:false,processEntities:false,parseTagValue:false,removeNSPrefix:true}).parse(xml));
+    let items: Data[];
+    try {
+      let rawItems: unknown;
+      if (document.rss !== undefined) {
+        const channel = object(document.rss).channel;
+        rawItems = object(channel === '' ? {} : channel).item;
+      } else if (document.feed !== undefined) rawItems = object(document.feed === '' ? {} : document.feed).entry;
+      else throw new Error('Unsupported feed');
+      items = rawItems === undefined ? [] : Array.isArray(rawItems) ? records(rawItems) : [object(rawItems)];
+    } catch { throw new AppError('INVALID_PROVIDER_DATA','Provider returned an invalid RSS/Atom feed',502); }
     return items.slice(0,100).map(item => {
       let link = item.link;
-      if (Array.isArray(link)) link = link.find(v => object(v)['@_rel'] === 'alternate') ?? link[0];
+      if (Array.isArray(link)) link = link.find(v => v && typeof v === 'object' && (!object(v)['@_rel'] || object(v)['@_rel'] === 'alternate'));
       if (link && typeof link === 'object') link = object(link)['@_href'];
       const date = string(item.pubDate ?? item.published); // Atom updated is not publication.
       const milliseconds = date && /(?:Z|[+-]\d{2}:?\d{2}|GMT|UTC)\s*$/i.test(date) ? Date.parse(date) : NaN;

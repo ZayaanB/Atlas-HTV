@@ -21,6 +21,8 @@ GDELT uses only the fixed DOC artlist endpoint, at most 100 results for one day.
 
 RSS requests reject redirects, DTD/entities, IP-literal/private-style URL forms and oversized bodies. Only reviewed hostnames may be configured; no arbitrary URL execution route/tool exists. Feed host DNS/egress must be reviewed by deployment configuration. Provider timeout defaults to 8 seconds. A failed/429 refresh retains stored news and records a retry no sooner than 15 minutes (respecting longer Retry-After, capped at 24 hours). Scheduled ingestion is deliberately not enabled; current execution is manual by approved source ID.
 
+Malformed XML, unsupported feed roots (including HTML error pages), malformed JSON envelopes and invalid record lists are rejected as upstream failures, rather than recorded as successful empty refreshes. Valid empty RSS/Atom feeds remain valid empty results. Provider fetch and body-read deadlines are enforced at the adapter boundary, including when an injected transport ignores its signal. Body cleanup errors do not replace the original status/size failure.
+
 ## Flight regions and access
 
 Each `regions` record must validate through shared `FlightRegion`: `id`, center `latitude`, `longitude`, integer `radius_nm` 1–100. IDs are the only HTTP/model flight request selectors. These are configured geographic exploration regions, not claims of verified airports/facilities. Person 2 consumes shared `AircraftState` and region metadata; do not duplicate it in map code.

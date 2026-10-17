@@ -46,3 +46,34 @@ test('ingestion upserts unique URLs, records freshness, and retains data on prov
 test('provider streaming response sizes are bounded',async () => {
   await assert.rejects(readResponse(new Response('123456'),3),/safety bound/);
 });
+test('HTML and malformed feed bodies never count as a successful empty RSS refresh',async () => {
+  const feed = {...definition,provider:'rss',url:'https://example.org/feed'};
+  for (const body of ['<html><body>Provider unavailable</body></html>','<rss><channel><item></channel></rss>']) {
+    await assert.rejects(new Rss(1000,async () => new Response(body)).fetch(feed),/invalid RSS|malformed XML/);
+  }
+  assert.deepEqual(await new Rss(1000,async () => new Response('<rss><channel/></rss>')).fetch(feed),[]);
+});
+test('Atom title text, alternate links and publication time survive normalization',async () => {
+  const feed = {...definition,provider:'rss',url:'https://example.org/feed'};
+  const [article] = await new Rss(1000,async () => new Response('<feed xmlns="http://www.w3.org/2005/Atom"><entry><title type="text">123</title><link rel="self" href="https://example.invalid/api"/><link rel="alternate" href="https://example.invalid/story"/><published>2026-01-01T12:00:00Z</published><updated>2026-01-02T12:00:00Z</updated></entry></feed>')).fetch(feed);
+  assert.equal(article!.title,'123'); assert.equal(article!.url,'https://example.invalid/story'); assert.equal(article!.published_at,'2026-01-01T12:00:00.000Z');
+});
+test('malformed provider JSON is rejected with an upstream error',async () => {
+  for (const body of ['not json','[]','{"articles":[null]}']) await assert.rejects(new Gdelt(1000,async () => new Response(body)).fetch(definition),error => {
+    return error instanceof Error && 'status' in error && error.status === 502;
+  });
+});
+test('provider body reading respects cancellation even when a stream ignores it', {timeout:2000},async () => {
+  const controller = new AbortController();
+  const stream = new ReadableStream<Uint8Array>({pull:() => new Promise(() => {})});
+  const pending = assert.rejects(readResponse(new Response(stream),100,controller.signal),/cancelled/);
+  controller.abort(); await pending;
+});
+test('body cleanup errors do not mask provider status or size failures',async () => {
+  const stream = () => new ReadableStream<Uint8Array>({cancel:() => Promise.reject(new Error('cleanup failure'))});
+  await assert.rejects(readResponse(new Response(stream(),{status:429})),/Provider request failed/);
+  await assert.rejects(readResponse(new Response(stream(),{headers:{'content-length':'200'}}),100),/safety bound/);
+});
+test('a stalled provider cannot ignore the configured request deadline', {timeout:2000},async () => {
+  await assert.rejects(new Gdelt(100,async () => new Promise(() => {})).fetch(definition),/cancelled/);
+});

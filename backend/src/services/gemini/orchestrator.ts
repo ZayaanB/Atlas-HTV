@@ -11,6 +11,7 @@ export class Assistant {
   private active = 0;
   constructor(private config: Config, private contracts: Contracts, private retrieval: Retrieval, private flights?: Flights, private model?: Model) {}
   async answer(raw: unknown, parent?: AbortSignal): Promise<Data> {
+    checkAbort(parent);
     const input = this.contracts.parse('AssistantRequest', raw);
     if (Buffer.byteLength(JSON.stringify(input)) > 24000 || string(input.message).length > 4000) throw new AppError('REQUEST_TOO_LARGE', 'Assistant request exceeds safety bound', 413);
     if (this.active >= this.config.aiConcurrency) throw new AppError('ASSISTANT_BUSY', 'Assistant concurrency limit reached', 429, true);
@@ -41,12 +42,14 @@ export class Assistant {
       for (let round = 0; round < this.config.aiMaxRounds; round++) {
         checkAbort(signal);
         if (Buffer.byteLength(JSON.stringify(contents)) > this.config.aiMaxContextBytes) throw new AppError('CONTEXT_LIMIT', 'Retrieved evidence exceeded assistant context limit', 502);
-        const turn = await this.model.generate(contents,declarations,signal);
+        const turn = await bounded(this.model.generate(contents,declarations,signal),signal);
+        checkAbort(signal);
         if (turn.calls.length) {
           if (calls+turn.calls.length > this.config.aiMaxTools) throw new AppError('TOOL_LIMIT', 'Assistant tool limit reached', 502);
           contents.push(turn.content);
           const parts = [];
           for (const call of turn.calls) {
+            checkAbort(signal);
             calls++;
             if (!isTool(call.name)) throw new AppError('INVALID_TOOL', 'Assistant proposed an unsupported tool', 502);
             let result: Data;

@@ -4,7 +4,9 @@ export class AppError extends Error {
   }
 }
 export const unavailable = (code: string, message: string) => new AppError(code, message, 503, true);
-export function checkAbort(signal?: AbortSignal): void { signal?.throwIfAborted(); }
+export function checkAbort(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new AppError('REQUEST_CANCELLED', 'Request cancelled or timed out', 408, true);
+}
 export async function bounded<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) {
     // The operation may already have started evaluating before bounded() is entered.

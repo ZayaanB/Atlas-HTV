@@ -6,7 +6,7 @@ import { EvidenceLedger } from '../src/services/gemini/citations.js';
 import { Tools } from '../src/services/gemini/tools.js';
 import { Assistant } from '../src/services/gemini/orchestrator.js';
 import type { Model, ModelTurn } from '../src/services/gemini/client.js';
-import { protocolArticle, testContracts, TestRepository } from './support.js';
+import { deferred, protocolArticle, testContracts, TestRepository } from './support.js';
 const input = {request_id:'test-request',message:'Describe the test record',timezone:'America/Toronto',filters:{}};
 const draft = {answer:'Synthetic protocol answer',citations:[{source_id:'source-test-record',record_id:'test-record'}],result_ids:['test-record'],actions:[]};
 function setup(model?: Model, config = readConfig({NODE_ENV:'test'})) {
@@ -79,4 +79,23 @@ test('search tools inherit active filters and cannot silently replace geography'
   const result = await tools.dispatch('search_news',{keyword:'synthetic'});
   assert.equal((result.items as unknown[]).length,1);
   await assert.rejects(tools.dispatch('search_news',{location_ids:['another-place']}),/set_filters/);
+});
+test('a model response arriving after cancellation cannot dispatch proposed tools',async () => {
+  const modelTurn = deferred<ModelTurn>(), entered = deferred<void>();
+  const {assistant,repo} = setup({generate:async () => {entered.resolve(); return modelTurn.promise;}});
+  const controller = new AbortController();
+  const pending = assistant.answer({...input,allow_ui_actions:true},controller.signal);
+  await entered.promise;
+  const readsBeforeCancellation = repo.calls.length;
+  controller.abort(); await assert.rejects(pending,/cancelled/);
+  modelTurn.resolve({content:{role:'model',parts:[]},text:'',calls:[{name:'focus_location',args:{location_id:'test-place'}}]});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(repo.calls.length,readsBeforeCancellation);
+});
+test('already-cancelled assistant input starts no retrieval or model work',async () => {
+  let called = false;
+  const {assistant,repo} = setup({generate:async () => {called = true; return final(draft);}});
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(assistant.answer(input,controller.signal),/cancelled/);
+  assert.equal(repo.calls.length,0); assert.equal(called,false);
 });

@@ -8,7 +8,7 @@ import { Retrieval } from '../src/services/retrieval.js';
 import { Flights } from '../src/services/flights.js';
 import { Assistant } from '../src/services/gemini/orchestrator.js';
 import type pg from 'pg';
-import { testContracts, TestRepository } from './support.js';
+import { deferred, testContracts, TestRepository } from './support.js';
 test('configuration fails closed without exposing credentials and accepts valid bounds',() => {
   for (const env of [{PORT:'x'},{DATABASE_URL:'postgres://secret@host/db?sslmode=no-verify'},{GEMINI_API_KEY:'secret'},{AI_MAX_TOOL_CALLS:'999'},{FLIGHTS_ENABLED:'yes'}]) assert.throws(() => readConfig(env));
   assert.equal(readConfig({PORT:'3100'}).port,3100);
@@ -49,4 +49,75 @@ test('pg query values are parameterized; transactions roll back without SQL cons
   await assert.rejects(repo.writeBatch('upsert_articles',[{id:'fail'}]));
   assert.equal(calls.at(-1)!.text,'ROLLBACK'); assert.equal(released,true);
   await assert.rejects(new UnavailableRepository().read(),/handoff/);
+});
+function appServices(config: ReturnType<typeof readConfig>, repository = new TestRepository()) {
+  const contracts = testContracts(), retrieval = new Retrieval(contracts,repository), flights = new Flights(contracts,config,[]);
+  return {contracts,repository,retrieval,flights,assistant:new Assistant(config,contracts,retrieval,flights)};
+}
+test('rate limiting returns a stable 429 envelope and Retry-After rather than a 500',async () => {
+  const config = readConfig({NODE_ENV:'test',RATE_LIMIT_MAX:'1'}), app = await buildApp(config,appServices(config));
+  try {
+    assert.equal((await app.inject('/api/health/live')).statusCode,200);
+    const limited = await app.inject('/api/health/live');
+    assert.equal(limited.statusCode,429); assert.equal(limited.json().error.code,'RATE_LIMIT');
+    assert.equal(limited.json().error.retryable,true); assert.ok(limited.headers['retry-after']);
+  } finally { await app.close(); }
+});
+test('request deadline releases a stuck manual adapter and aborts its signal', {timeout:2000},async () => {
+  const config = readConfig({NODE_ENV:'test',REQUEST_TIMEOUT_MS:'100'}), services = appServices(config);
+  let signal: AbortSignal | undefined;
+  services.repository.read = async (_name,_input,requestSignal?: AbortSignal) => { signal = requestSignal; return new Promise(() => {}); };
+  const app = await buildApp(config,services);
+  try {
+    const response = await app.inject('/api/news');
+    assert.equal(response.statusCode,503); assert.equal(response.json().error.code,'REQUEST_TIMEOUT');
+    assert.equal(signal?.aborted,true);
+  } finally { await app.close(); }
+});
+test('closing the app cancels in-flight work before releasing the repository', {timeout:2000},async () => {
+  const config = readConfig({NODE_ENV:'test'}), services = appServices(config);
+  const entered = deferred<void>(); let signal: AbortSignal | undefined;
+  services.repository.read = async (_name,_input,requestSignal?: AbortSignal) => { signal = requestSignal; entered.resolve(); return new Promise(() => {}); };
+  const app = await buildApp(config,services);
+  const response = app.inject('/api/news');
+  await entered.promise;
+  await app.close();
+  assert.equal(signal?.aborted,true); assert.equal(services.repository.closed,true);
+  assert.equal((await response).statusCode,408);
+});
+test('invalid configuration combinations fail using variable names, never secret values',() => {
+  for (const env of [{GEMINI_API_KEY:' secret ',GEMINI_MODEL:'test-model'},{EMBEDDING_MODEL:'test-embedding',EMBEDDING_DIMENSIONS:'3'},
+    {EMBEDDING_VERSION:'orphan'},{FLIGHTS_ENABLED:''},{PORT:'3e3'},{REQUEST_TIMEOUT_MS:''},
+    {FLIGHTS_STALE_AFTER_MS:'300000',FLIGHTS_CACHE_TTL_MS:'10000'},{DATABASE_URL:'postgresql://host/'}]) {
+    assert.throws(() => readConfig(env),error => error instanceof Error && !error.message.includes('secret'));
+  }
+});
+test('incomplete query plans cannot report ready even with a working database connection',async () => {
+  const config = readConfig({NODE_ENV:'test'}), services = appServices(config);
+  const repository = {mode:'stored' as const,missingPlans:['news'],read:services.repository.read.bind(services.repository),
+    health:async () => true,close:async () => {}};
+  const app = await buildApp(config,{...services,repository});
+  try {
+    const response = await app.inject('/api/health');
+    assert.equal(response.statusCode,503); assert.equal(response.json().database,true); assert.equal(response.json().query_plans,false);
+  } finally { await app.close(); }
+});
+test('rollback failure discards the broken client and preserves the original write error',async () => {
+  const original = new Error('original write failed'); let discarded: boolean | undefined;
+  const client = {query:async (input: unknown) => {
+    if (input === 'BEGIN') return;
+    if (input === 'ROLLBACK') throw new Error('rollback failed');
+    throw original;
+  },release:(discard: boolean) => {discarded = discard;}};
+  const repo = new PgRepository({connect:async () => client} as unknown as pg.Pool,
+    {version:'atlas-p3-v1',plans:{upsert_articles:{text:'SELECT approved_import($1)',parameters:['id']}}});
+  await assert.rejects(repo.writeBatch('upsert_articles',[{id:'test-record'}]),error => error === original);
+  assert.equal(discarded,true);
+});
+test('already-cancelled writes do not acquire a connection',async () => {
+  let acquired = false;
+  const repo = new PgRepository({connect:async () => {acquired = true; throw new Error('unexpected connect');}} as unknown as pg.Pool,
+    {version:'atlas-p3-v1',plans:{}});
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(repo.writeBatch('upsert_articles',[],controller.signal),/cancelled/); assert.equal(acquired,false);
 });

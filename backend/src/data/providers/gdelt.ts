@@ -1,6 +1,6 @@
 import { AppError } from '../../runtime/errors.js';
-import { type Data, object, records, string } from '../../services/validation.js';
-import { readResponse, type Fetch } from './http.js';
+import { type Data, records, string } from '../../services/validation.js';
+import { fetchText, jsonObject, type Fetch } from './http.js';
 export class Gdelt {
   constructor(private timeoutMs: number, private fetcher: Fetch = fetch) {}
   async fetch(definition: Data, signal?: AbortSignal): Promise<Data[]> {
@@ -8,9 +8,8 @@ export class Gdelt {
     if (!query.trim() || query.length > 512) throw new AppError('SOURCE_DEFINITION_INVALID','GDELT requires a reviewed bounded query');
     const url = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
     for (const [key,value] of Object.entries({query,mode:'artlist',format:'json',maxrecords:'100',timespan:'1d',sort:'datedesc'})) url.searchParams.set(key,value);
-    const response = await this.fetcher(url,{redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(this.timeoutMs),...(signal ? [signal] : [])]),headers:{accept:'application/json'}});
-    const result = object(JSON.parse(await readResponse(response)));
-    if (!Array.isArray(result.articles)) throw new AppError('INVALID_PROVIDER_DATA','GDELT returned an invalid article list',502);
+    const result = jsonObject(await fetchText(this.fetcher,url,{redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(this.timeoutMs),...(signal ? [signal] : [])]),headers:{accept:'application/json'}}));
+    if (!Array.isArray(result.articles) || result.articles.some(row => !row || typeof row !== 'object' || Array.isArray(row))) throw new AppError('INVALID_PROVIDER_DATA','GDELT returned an invalid article list',502);
     return records(result.articles).slice(0,100).map(row => ({
       url:row.url,title:row.title,publisher:row.domain,excerpt:null,published_at:null,
       discovered_at:gdeltDate(row.seendate),publication_time_basis:'unavailable',provider:'gdelt'

@@ -1,4 +1,4 @@
-import { AppError } from '../../runtime/errors.js';
+import { AppError, checkAbort } from '../../runtime/errors.js';
 import { Contracts, type Data, string } from '../validation.js';
 import { Retrieval } from '../retrieval.js';
 import type { Flights } from '../flights.js';
@@ -13,6 +13,7 @@ export class Tools {
   readonly actions: Data[] = [];
   constructor(private contracts: Contracts, private retrieval: Retrieval, private flights?: Flights, private activeFilters: Data = {}, private allowActions = true) {}
   async action(raw: unknown, signal?: AbortSignal): Promise<Data> {
+    checkAbort(signal);
     if (!this.allowActions) throw new AppError('ACTION_NOT_AUTHORIZED','Workspace changes require allow_ui_actions for this request',502);
     const action = this.contracts.parse('UIAction', raw);
     if (action.type === 'set_filters') {
@@ -22,9 +23,11 @@ export class Tools {
     } else if (action.type === 'focus_location') {
       await this.retrieval.location(string(action.location_id), signal);
     } else throw new AppError('INVALID_ACTION', 'Unsupported UI action', 502);
+    checkAbort(signal);
     return action;
   }
   async dispatch(name: string, raw: unknown, signal?: AbortSignal): Promise<Data> {
+    checkAbort(signal);
     if (!isTool(name)) throw new AppError('INVALID_TOOL', 'Tool is not allowlisted');
     const args = this.contracts.parse(toolSchemas[name],raw);
     switch (name) {

@@ -4,7 +4,7 @@ Implementation is authorized for this workstream. This directory now contains a 
 
 **Current runtime:** liveness works without credentials. Readiness returns 503 and data routes fail with an explicit missing-contract/setup error until the shared contracts and frozen database handoff are supplied. The repository's `contracts/`, migrations, source definitions, and seeds were comment-only when this implementation began. No factual development dataset has been invented. Test data and model responses are synthetic protocol doubles, used only by tests.
 
-No real Gemini request, Tiger Cloud query, news import, embedding generation, or flight request has been executed. No migrations, resource provisioning, deployment, commits, or pushes have been performed. Implemented adapters are not evidence of completed sponsor integrations.
+No real Gemini request, Tiger Cloud query, news import, embedding generation, or flight request has been executed. The agent has not run migrations, provisioned resources, deployed, committed, or pushed. Implemented adapters are not evidence of completed sponsor integrations.
 
 ## Run locally
 
@@ -21,17 +21,20 @@ The server defaults to `127.0.0.1:3001`. Set `HOST=0.0.0.0` only when the deploy
 ```bash
 npm --prefix backend run typecheck
 npm --prefix backend test
+npm --prefix backend run check
 npm --prefix backend run build
 npm --prefix backend start
 ```
 
-`app.ts` composes without listening. `server.ts` owns listening, SIGINT/SIGTERM, connection draining and shutdown; closing the app closes its owned pool. Requests have size/time/rate bounds; assistant generation also has bounded concurrency, tool calls, rounds, context, and output. Logs exclude raw errors, bodies, prompts, and credentials. Bindings are local and CORS is not enabled: the intended integration is Caddy serving frontend and `/api` on the same origin. The rate limiter uses the socket IP (`trustProxy=false`), so a reverse proxy shares that budget; Person 4/Person 3 must agree trusted proxy topology before changing it.
+`app.ts` composes without listening. `server.ts` owns listening, SIGINT/SIGTERM, connection draining and shutdown; closing the app cancels pending work and closes its owned pool. `REQUEST_TIMEOUT_MS` defaults to 30 seconds for the entire route lifecycle; expiry returns a structured 503 `REQUEST_TIMEOUT`. Disconnect/shutdown cancellation prevents late work from returning actions. Assistant generation also has bounded concurrency, tool calls, rounds, context, and output. Rate limiting returns 429 `RATE_LIMIT` with Retry-After. Logs exclude raw errors, bodies, prompts, and credentials. Bindings are local and CORS is not enabled: the intended integration is Caddy serving frontend and `/api` on the same origin. The rate limiter uses the socket IP (`trustProxy=false`), so a reverse proxy shares that budget; Person 4/Person 3 must agree trusted proxy topology before changing it.
+
+`npm --prefix backend run check` validates environment and handoff exports locally, lists missing shared schemas/core query plans, and reports whether credentials are configured. It opens no database connection and calls no provider. Exit codes: 0 means data configuration is complete, 2 means required setup is missing, and 1 means configuration is invalid. Configured means available for a later live check, not verified access. Blank/whitespace settings, inconsistent embedding configuration, malformed query plans, duplicate source/region IDs, missing modules and modules outside their owned paths fail with safe diagnostics. Integration modules must be portable `.mjs` or built `.js` files.
 
 ## What is implemented
 
 | Area | Behavior | External dependency |
 | --- | --- | --- |
-| Health | `/api/health/live` is process liveness; `/api/health` checks contracts, repository mode and database connectivity | Full contracts and configured database for readiness |
+| Health | `/api/health/live` is process liveness; `/api/health` checks contracts, core query-plan availability, repository mode and database connectivity | Full contracts, core plans and configured database for readiness |
 | News/locations/investigations | Shared-schema validation; canonical filters; bounded results; precise locations and original record/source fields preserved | Person 1 schemas; Person 4 verified records/schema; reviewed SQL plans |
 | Timeline | Raw, time-filtered observations; source/unit-compatible endpoint comparison computed in application code | Real observations; TimescaleDB migration/aggregate handoff |
 | Gemini | Official `@google/genai`, manual allowlisted dispatch, bounded multi-turn function responses, source-linked answers, validated UI actions | Available model/key and a sourced dataset |
@@ -65,7 +68,7 @@ curl http://127.0.0.1:3001/api/assistant -H 'Content-Type: application/json' \
 The identifiers above are placeholders, not invented source records. An actual response currently obtainable with no setup is:
 
 ```json
-{"status":"not_ready","contracts":false,"database":false,"data_mode":"unavailable"}
+{"status":"not_ready","contracts":false,"database":false,"query_plans":false,"data_mode":"unavailable"}
 ```
 
 The consistent operational error envelope is:
@@ -93,9 +96,9 @@ Indexing reads an explicitly permitted stored chunk, compares hash/model/version
 
 ## Validation and remaining integration work
 
-Verified in this checkout: **29 behavioral tests passed**, TypeScript checks passed for source/tests, production build passed, and the built server returned liveness 200, readiness 503, and a structured missing-contract 503 for news. The server was stopped after the localhost smoke check. `git diff --check` passed; changes remain within `backend/`.
+Verified in this checkout: **52 behavioral tests passed**, including rate-limit/deadline regressions, cancellation of late model responses, stalled-provider shutdown, malformed provider/handoff rejection, and a separate server process that serves liveness and exits cleanly on SIGTERM. TypeScript checks passed for source/tests, the production build passed, and the local configuration checker accurately reports incomplete setup with exit code 2. Earlier built-server smoke checks returned liveness 200, readiness 503 and a structured missing-contract 503 for news. `git diff --check` passed; changes remain within `backend/`.
 
-Tests cover manual/tool filter parity, timestamp/bounds handling, validation, citation/source relationships, UI-action rejection, timeout/cancellation, tool limits, redaction, parameter binding/transaction rollback, embedding identity/fallback, import normalization/deduplication/permissions/failures, provider payloads and size limits, and flight cache/coalescing/backoff/expiry. They use injected synthetic dependencies and do not contact external providers.
+Tests cover manual/tool filter parity, timestamp/bounds handling, validation, citation/source relationships, UI-action rejection, timeout/cancellation, tool limits, redaction, parameter binding/transaction rollback, embedding identity/fallback, import normalization/deduplication/permissions/failures, provider payloads and size limits, and flight cache/coalescing/backoff/expiry. They use synthetic dependencies plus a temporary localhost server, and do not contact external providers. A failed rollback discards the affected pool client while preserving the original write error.
 
 To finish the real vertical slice, supply the authoritative runtime schemas, a frozen database schema/query handoff, TLS database credentials, one verified source-linked investigation and observation series, an available Gemini model/key, and reviewed source/flight configuration. Then run the migrations/imports with Person 4's authorization, verify real filtered queries and timeline, make a real cited Gemini call, and record integration evidence. None of those live validations is claimed by the current test suite.
 

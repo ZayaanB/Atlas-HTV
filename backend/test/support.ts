@@ -41,3 +41,10 @@ export function protocolArticle(id = 'test-record', changes: Data = {}): Data {
     url:`https://example.invalid/${id}`,location_ids:['test-place'],themes:['test-theme'],entity_ids:[],
     published_at:'2026-01-01T00:00:00.000Z',event_at:null,fetched_at:'2026-01-02T00:00:00.000Z',...changes};
 }
+
+export function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((accept,decline) => {resolve = accept; reject = decline;});
+  return {promise,resolve,reject};
+}
