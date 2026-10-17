@@ -7,12 +7,14 @@ import type { Flights } from '../flights.js';
 import { EvidenceLedger } from './citations.js';
 import { type Model, parseModelJson } from './client.js';
 import { isTool, Tools, toolSchemas } from './tools.js';
+import { audienceContext } from './audience.js';
 export class Assistant {
   private active = 0;
   constructor(private config: Config, private contracts: Contracts, private retrieval: Retrieval, private flights?: Flights, private model?: Model) {}
   async answer(raw: unknown, parent?: AbortSignal): Promise<Data> {
     checkAbort(parent);
     const input = this.contracts.parse('AssistantRequest', raw);
+    audienceContext(input.audience);
     if (Buffer.byteLength(JSON.stringify(input)) > 24000 || string(input.message).length > 4000) throw new AppError('REQUEST_TOO_LARGE', 'Assistant request exceeds safety bound', 413);
     if (this.active >= this.config.aiConcurrency) throw new AppError('ASSISTANT_BUSY', 'Assistant concurrency limit reached', 429, true);
     try { new Intl.DateTimeFormat('en', { timeZone: string(input.timezone) }); }
@@ -31,7 +33,7 @@ export class Assistant {
     ledger.attach(await this.retrieval.sources([...ledger.sourceIds],signal));
     if (!this.model) return this.fallback(input, initial, 'GEMINI_UNAVAILABLE',signal);
     const contents: Content[] = [{ role: 'user', parts: [{ text: JSON.stringify({
-      request: input, current_utc: new Date().toISOString(), evidence: initial, selected_investigation: selected
+      request: input, audience_context: audienceContext(input.audience), current_utc: new Date().toISOString(), evidence: initial, selected_investigation: selected
     }) }] }];
     const declarations: FunctionDeclaration[] = Object.entries(toolSchemas).filter(([name,schema]) => this.contracts.has(schema) && (input.allow_ui_actions === true || !['set_filters','focus_location'].includes(name))).map(([name,schema]) => ({
       name, description: `Atlas validated ${name}; preserve active filters unless user requests a change`,
