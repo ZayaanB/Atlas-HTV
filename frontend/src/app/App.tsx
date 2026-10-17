@@ -1,7 +1,3 @@
-<<<<<<< Updated upstream
-// Scaffold only; implementation has not started.
-// Person 1: compose map, feed, assistant/investigation panels, filters, and timeline against the shared state. Map internals belong to Person 2.
-=======
 import { lazy, Suspense, type ComponentType } from 'react';
 import type { Article } from '@atlas/contracts';
 import type { AtlasApi } from '../lib/api';
@@ -98,4 +94,3 @@ export function App({ api, MapComponent = DefaultAtlasMap }: { api: AtlasApi; Ma
     </main>
   </>;
 }
->>>>>>> Stashed changes

@@ -1,1 +1,61 @@
-# Scaffold only. Person 4: later serve the built frontend and reverse-proxy /api to the agreed backend address under HTTPS. No domain or active Caddy directives yet.
+# Atlas — Caddy on the Vultr VM (Person 4). Deploy to /etc/caddy/Caddyfile; see infra/README.md.
+# One HTTPS origin: the built frontend, /api reverse-proxied to the single Fastify process on loopback, and dated
+# evidence assets under /evidence. No secrets live here. The domain comes from the environment (/etc/atlas/caddy.env).
+{
+	# Admin API stays on loopback only (needed for `systemctl reload caddy`); never expose it.
+	admin 127.0.0.1:2019
+	# Optional: add `email you@example.org` here for ACME expiry notices (an empty value would not parse).
+}
+
+{$ATLAS_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Report-only until Person 1 confirms the production build; Mapbox GL JS needs blob: workers and its APIs.
+		Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.mapbox.com; connect-src 'self' https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com; worker-src blob:; child-src blob:; frame-ancestors 'none'; base-uri 'self'"
+		-Server
+	}
+
+	# Backend API: Fastify listens on 127.0.0.1:3001 (HOST/PORT in /etc/atlas/backend.env). Caddy replaces any
+	# client-supplied X-Forwarded-For with the real client address; the backend currently ignores it
+	# (trustProxy=false), so its rate limit is shared by all clients (see infra/README.md, Person 3 follow-up).
+	handle /api/* {
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy 127.0.0.1:3001 {
+			health_uri /api/health/live
+			health_interval 30s
+			health_timeout 5s
+		}
+	}
+
+	# Dated evidence imagery (assets/evidence/<investigation>/<file>), immutable per file name.
+	handle_path /evidence/* {
+		root * /opt/atlas/assets/evidence
+		@meta path *.md
+		respond @meta 404
+		header Cache-Control "public, max-age=86400"
+		file_server
+	}
+
+	# Built frontend (Person 1's Vite output) with SPA fallback for application routes.
+	handle {
+		root * /opt/atlas/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output file /var/log/caddy/atlas-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+	}
+}

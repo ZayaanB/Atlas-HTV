@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Scaffolding and documentation only. Implementation has not been authorized yet.** Keep source/configuration placeholders comment-only. Do not install packages, generate application code, run migrations/imports, call paid/provider APIs, provision resources, deploy, or publish. Begin implementation only after a subsequent explicit user instruction to start work. This gate applies to all four workstreams; planning an implementation sequence is not permission to execute it.
+**Person 1's frontend foundation is authorized** by the explicit instruction to implement its approved plan: React/Vite, Zustand, TanStack Query, news/location contracts, typed API access, labeled historical fixtures, minimal map/feed shell, and Person 2's integration interface. Router and remaining feature implementations are deferred. Existing backend/data implementations have their own handoff instructions; this authorization does not expand their scope. Do not run migrations/imports, call paid/provider APIs, provision resources, deploy, or publish as part of this slice. Map feature files remain Person 2's placeholders until separately implemented.
 
 ## Read first
 
