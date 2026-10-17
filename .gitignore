@@ -1,0 +1,17 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local credentials; commit examples only
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.log
+
+# Local editor/OS files
+.DS_Store
+.idea/
