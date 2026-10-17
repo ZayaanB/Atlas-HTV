@@ -21,6 +21,7 @@ export function testContracts() {
     AssistantRequest:shape({message:{type:'string',minLength:1},filters,request_id:text,timezone:text,selected_investigation_id:text,allow_ui_actions:{type:'boolean'},audience:text},['message','request_id','timezone']),
     AssistantDraft:shape({answer:text,citations:{type:'array',items:{type:'object'},maxItems:30},result_ids:array,actions:{type:'array',items:{type:'object'},maxItems:8}},['answer','citations','result_ids','actions'])
   };
+  schemas.CitationReference=shape({source_id:text,record_id:text},['source_id','record_id']);
   for (const name of ['Article','Location','Observation','Source','AircraftState','Citation']) schemas[name] = {type:'object'};
   for (const name of ['NewsResponse','LocationsResponse','ObservationsResponse','InvestigationResponse','FlightsResponse','AssistantResponse']) schemas[name] = {type:'object'};
   return new Contracts(schemas);

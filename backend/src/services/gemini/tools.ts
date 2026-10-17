@@ -9,6 +9,18 @@ export const toolSchemas = {
 } as const;
 export type ToolName = keyof typeof toolSchemas;
 export function isTool(name: string): name is ToolName { return Object.hasOwn(toolSchemas,name); }
+function hasConstraint(key: string,value: unknown): boolean {
+  if (['location_ids','themes','entity_ids'].includes(key)) return Array.isArray(value) && value.length>0;
+  if (['keyword','semantic_query'].includes(key)) return typeof value==='string' && value.trim().length>0;
+  return value!==undefined;
+}
+function equivalentConstraint(key: string,left: unknown,right: unknown): boolean {
+  if (['location_ids','themes','entity_ids'].includes(key) && Array.isArray(left) && Array.isArray(right))
+    return JSON.stringify([...new Set(left)].sort())===JSON.stringify([...new Set(right)].sort());
+  if (['published_from','published_to'].includes(key) && typeof left==='string' && typeof right==='string') return Date.parse(left)===Date.parse(right);
+  if (key==='keyword' && typeof left==='string' && typeof right==='string') return left.trim().toLocaleLowerCase('en')===right.trim().toLocaleLowerCase('en');
+  return JSON.stringify(left)===JSON.stringify(right);
+}
 export class Tools {
   readonly actions: Data[] = [];
   constructor(private contracts: Contracts, private retrieval: Retrieval, private flights?: Flights, private activeFilters: Data = {}, private allowActions = true) {}
@@ -32,8 +44,8 @@ export class Tools {
     const args = this.contracts.parse(toolSchemas[name],raw);
     switch (name) {
       case 'search_news': {
-        for (const key of ['location_ids','themes','entity_ids','bounds','published_from','published_to']) {
-          if (this.activeFilters[key] !== undefined && args[key] !== undefined && JSON.stringify(this.activeFilters[key]) !== JSON.stringify(args[key]))
+        for (const key of ['location_ids','themes','entity_ids','bounds','published_from','published_to','keyword','semantic_query']) {
+          if (hasConstraint(key,this.activeFilters[key]) && args[key] !== undefined && !equivalentConstraint(key,this.activeFilters[key],args[key]))
             throw new AppError('FILTER_CONFLICT','Use set_filters to change active workspace constraints');
         }
         return this.retrieval.news({...this.activeFilters,...args},signal);
