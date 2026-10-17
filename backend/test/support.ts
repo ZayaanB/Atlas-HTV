@@ -3,7 +3,7 @@
 import type { AnySchema } from 'ajv';
 import { Contracts, type Data } from '../src/services/validation.js';
 import type { Read, Repository } from '../src/data/queries.js';
-const text = {type:'string'}, array = {type:'array',items:text,maxItems:20};
+const text = {type:'string'}, array = {type:'array',items:text,maxItems:100};
 const shape = (properties: Data, required: string[] = [], additionalProperties = false) => ({type:'object',properties,required,additionalProperties});
 const filters = shape({location_ids:array,themes:array,entity_ids:array,keyword:text,semantic_query:text,published_from:text,published_to:text,
   bounds:{type:'array',items:{type:'number'},minItems:4,maxItems:4},limit:{type:'integer',minimum:1,maximum:100},offset:{type:'integer',minimum:0,maximum:10000}});

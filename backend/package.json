@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "check": "node --env-file-if-exists=.env --import tsx src/check.ts",
     "verify:connections": "node --env-file-if-exists=.env --import tsx src/verify-connections.ts",
+    "setup:tiger": "node --env-file-if-exists=.env --import tsx src/setup-tiger.ts",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "node --import tsx --test test/*.test.ts",

@@ -39,8 +39,15 @@ export class Retrieval {
     let items = candidates;
     if (query.bounds) {
       const [w,s,e,n] = bounds(query.bounds)! as [number,number,number,number];
-      const places = await this.locations({ ids: [...new Set(candidates.flatMap(a => strings(a.location_ids)))] }, signal);
-      const ids = new Set(records(places.items).filter(p => {
+      const requested = [...new Set(candidates.flatMap(a => strings(a.location_ids)))];
+      const places: Data[] = [];
+      // A news page can reference more than 100 places. Respect the shared ID/page
+      // bounds without dropping places after the default 50-row location page.
+      for (let start=0;start<requested.length;start+=100) {
+        checkAbort(signal);
+        places.push(...await this.locationItems({ids:requested.slice(start,start+100),limit:100,offset:0},signal));
+      }
+      const ids = new Set(places.filter(p => {
         const c = p.coordinates;
         // A broad location must be contained as a whole, not given false point precision.
         if (p.bounds) {
@@ -58,13 +65,17 @@ export class Retrieval {
     }, true);
   }
   async locations(raw: unknown, signal?: AbortSignal): Promise<Data> {
+    const items = await this.locationItems(raw,signal);
+    checkAbort(signal);
+    return this.contracts.parse('LocationsResponse', { items, coverage: await this.coverage(signal) }, true);
+  }
+  private async locationItems(raw: unknown, signal?: AbortSignal): Promise<Data[]> {
     const query = this.contracts.parse('LocationsQuery', raw);
     const rows = await this.repository.read('locations', { ...query, ...page(query) }, signal);
     const ids = strings(query.ids), term = string(query.query).toLocaleLowerCase('en');
-    const items = rows.map(r => this.contracts.parse('Location', r, true))
+    return rows.map(r => this.contracts.parse('Location', r, true))
       .filter(r => (!ids.length || ids.includes(string(r.id))) && (!term || string(r.name).toLocaleLowerCase('en').includes(term)))
       .slice(0, page(query).limit);
-    return this.contracts.parse('LocationsResponse', { items, coverage: await this.coverage(signal) }, true);
   }
   async location(id: string, signal?: AbortSignal): Promise<Data> {
     const result = await this.locations({ ids: [id] }, signal);
