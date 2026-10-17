@@ -16,7 +16,7 @@ Supply a reviewed module under `contracts/` exporting `schemas: Record<string, J
 | `FlightsQuery` | `region_id` from reviewed configuration; no global or arbitrary bounding requests |
 | `FindAircraftArgs` | `region_id`, `identifier` exact aircraft hex/callsign in that bounded feed |
 | `FocusLocationArgs` | `location_id` known stored location |
-| `AssistantRequest` | `request_id`, `message` (1–4000 chars), `timezone` IANA; optional `filters`, `selected_investigation_id`, `allow_ui_actions` boolean default false; any history/audience additions must have bounded schemas |
+| `AssistantRequest` | `request_id`, `message` (1–4000 chars), `timezone` IANA; optional `filters`, `selected_investigation_id`, `allow_ui_actions` boolean default false, `audience` enum `general_public` / `journalist` / `investor` defaulting in backend policy to `general_public`; history additions need bounded schemas |
 | `AssistantDraft` | Model-only `answer` plain string, `citations` [{`source_id`,`record_id`}], `result_ids` array, `actions` array; no arbitrary URLs or executable content |
 | `UIAction` | Closed union: `{type:"set_filters",filters:NewsQuery}` or `{type:"focus_location",location_id:string}` |
 | `FlightRegion` | Reviewed `id`, `latitude`, `longitude`, integer `radius_nm` 1–100; provider requests use lat/lon, shared map records use lon/lat |
@@ -52,3 +52,5 @@ Preserve distinct event/publication/discovery/observation/fetch times. GDELT `se
 Health/error envelopes are operational and work before domain contracts exist; agree their final shared definitions with Person 1. Responses use `error:{code,message,retryable,request_id}` for HTTP failures. Request/output validation errors are 400/502; missing dependencies are 503; unknown records 404; bounds/size/rate limits 400/413/429. Model output rejection yields a labeled assistant fallback with zero actions. Disconnected/time-expired requests do not yield actions.
 
 Person 1 should supply shared verified fixtures once Person 4's records are available. Backend tests currently cover protocol behavior only. Frontend must discard stale assistant request IDs, keep selection/camera state itself, use returned precision, and render fallback/coverage/source notices.
+
+Audience prompt policy now exists in the backend, with tests showing the same retrieval/citations/actions across all three perspectives. `AssistantRequest` is still absent from the authoritative registry, so this is not a completed assistant integration. Audience relevance badges and an optional news filter require separate agreed Article/NewsQuery fields and a frozen database handoff; none are silently injected into today's closed responses. See [global discovery and audience handoff](global-discovery-handoff.md).

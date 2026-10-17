@@ -18,7 +18,7 @@ export function testContracts() {
     FlightsQuery:shape({region_id:text},['region_id']),FindAircraftArgs:shape({region_id:text,identifier:text},['region_id','identifier']),
     FlightRegion:shape({id:text,latitude:{type:'number'},longitude:{type:'number'},radius_nm:{type:'integer'}},['id','latitude','longitude','radius_nm']),
     UIAction:{oneOf:[shape({type:{const:'set_filters'},filters},['type','filters']),shape({type:{const:'focus_location'},location_id:text},['type','location_id'])]},
-    AssistantRequest:shape({message:{type:'string',minLength:1},filters,request_id:text,timezone:text,selected_investigation_id:text,allow_ui_actions:{type:'boolean'}},['message','request_id','timezone']),
+    AssistantRequest:shape({message:{type:'string',minLength:1},filters,request_id:text,timezone:text,selected_investigation_id:text,allow_ui_actions:{type:'boolean'},audience:text},['message','request_id','timezone']),
     AssistantDraft:shape({answer:text,citations:{type:'array',items:{type:'object'},maxItems:30},result_ids:array,actions:{type:'array',items:{type:'object'},maxItems:8}},['answer','citations','result_ids','actions'])
   };
   for (const name of ['Article','Location','Observation','Source','AircraftState','Citation']) schemas[name] = {type:'object'};
