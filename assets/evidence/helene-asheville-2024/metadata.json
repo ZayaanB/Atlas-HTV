@@ -1,0 +1,70 @@
+{
+  "comparison_group": "helene-asheville-hls-l30",
+  "title": "Asheville rivers before and after Hurricane Helene (HLS L30, 30 m)",
+  "investigation_id": "inv-helene-asheville-2024",
+  "bounds": [-82.62, 35.54, -82.52, 35.62],
+  "bounds_order": "west,south,east,north (WGS84 degrees, longitude first)",
+  "mapbox_image_coordinates": [[-82.62, 35.62], [-82.52, 35.62], [-82.52, 35.54], [-82.62, 35.54]],
+  "mapbox_image_coordinates_order": "top-left, top-right, bottom-right, bottom-left as [longitude, latitude]",
+  "crs": "EPSG:4326 (equirectangular PNG); max placement error when rendered by corners in Web Mercator is 1.1 m on the ground",
+  "native_resolution_m": 30,
+  "asset_pixel_size_m": 15,
+  "image_size_px": [604, 592],
+  "attribution": "NASA LP DAAC HLS L30 v2.0 (doi:10.5067/HLS/HLSL30.002); Landsat 8 and Landsat 9 courtesy of NASA/USGS; imagery via NASA GIBS",
+  "license": "CC0 per NASA EOSDIS data use guidance (no restrictions; citation requested)",
+  "license_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance",
+  "dataset_url": "https://www.earthdata.nasa.gov/data/catalog/lpcloud-hlsl30-2.0",
+  "legend": [
+    { "appearance": "green", "meaning": "vegetation" },
+    { "appearance": "grey / white", "meaning": "roads, roofs and paved areas (white specks can also be small clouds)" },
+    { "appearance": "dark green-brown ribbon", "meaning": "river channel" },
+    { "appearance": "tan / light brown along river corridors (after image only)", "meaning": "bare sediment or scoured ground not present on 2024-08-30" },
+    { "appearance": "transparent", "meaning": "masked or no-data pixels" }
+  ],
+  "cannot_show": [
+    "the peak flood extent (the after image is 12 days after the crest)",
+    "water depth, damage to individual buildings, or building identity (no building or parcel recognition)",
+    "property ownership or who was affected",
+    "any quantity of damage or economic loss from colour change alone"
+  ],
+  "alignment_check": "Same MGRS tile (17SLV) and HLS 30 m grid; same WMS bbox and pixel size; phase correlation of gradient images finds 0 px offset (peak 0.71, next 0.07).",
+  "not_basemap": "These are dated NASA HLS observations, independent of the Mapbox satellite basemap. Never substitute a basemap screenshot.",
+  "assets": [
+    {
+      "evidence_id": "ev-hls-l30-asheville-2024-08-30",
+      "role": "before",
+      "file": "hls-l30-2024-08-30-before.png",
+      "sha256": "e101b97684749f92eefed246eaab24486821b49105e4e82a79ff136e7044afe8",
+      "granule": "HLS.L30.T17SLV.2024243T160534.v2.0",
+      "cmr_concept_id": "G3222264591-LPCLOUD",
+      "source_url": "https://cmr.earthdata.nasa.gov/search/concepts/G3222264591-LPCLOUD.umm_json",
+      "platform": "Landsat 8 OLI",
+      "landsat_product_ids": ["LC08_L1TP_018035_20240830_20240830_02_RT", "LC08_L1TP_018036_20240830_20240830_02_RT"],
+      "acquired_from": "2024-08-30T16:05:34.646Z",
+      "acquired_to": "2024-08-30T16:05:58.537Z",
+      "granule_cloud_cover_percent": 17,
+      "crop_condition": "clear apart from 124 masked pixels (0.03%)",
+      "layer_ref": "NASA GIBS WMS HLS_L30_Nadir_BRDF_Adjusted_Reflectance, TIME=2024-08-30",
+      "retrieval_url": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=HLS_L30_Nadir_BRDF_Adjusted_Reflectance&STYLES=&CRS=EPSG:4326&BBOX=35.54,-82.62,35.62,-82.52&WIDTH=604&HEIGHT=592&FORMAT=image/png&TIME=2024-08-30",
+      "retrieved_at": "2026-10-17T11:48:54Z"
+    },
+    {
+      "evidence_id": "ev-hls-l30-asheville-2024-10-09",
+      "role": "after",
+      "file": "hls-l30-2024-10-09-after.png",
+      "sha256": "7b29a40a2b825cc1abdd7fc357abfcdae8ed2dce96317e6bf08f73a5efc220f5",
+      "granule": "HLS.L30.T17SLV.2024283T160541.v2.0",
+      "cmr_concept_id": "G3263842231-LPCLOUD",
+      "source_url": "https://cmr.earthdata.nasa.gov/search/concepts/G3263842231-LPCLOUD.umm_json",
+      "platform": "Landsat 9 OLI",
+      "landsat_product_ids": ["LC09_L1TP_018035_20241009_20241009_02_T1", "LC09_L1TP_018036_20241009_20241009_02_T1"],
+      "acquired_from": "2024-10-09T16:05:41.056Z",
+      "acquired_to": "2024-10-09T16:06:04.951Z",
+      "granule_cloud_cover_percent": 0,
+      "crop_condition": "clear apart from 346 masked pixels (0.10%) and a few small bright spots",
+      "layer_ref": "NASA GIBS WMS HLS_L30_Nadir_BRDF_Adjusted_Reflectance, TIME=2024-10-09",
+      "retrieval_url": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=HLS_L30_Nadir_BRDF_Adjusted_Reflectance&STYLES=&CRS=EPSG:4326&BBOX=35.54,-82.62,35.62,-82.52&WIDTH=604&HEIGHT=592&FORMAT=image/png&TIME=2024-10-09",
+      "retrieved_at": "2026-10-17T11:48:55Z"
+    }
+  ]
+}

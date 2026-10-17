@@ -1,0 +1,41 @@
+# Atlas backend — systemd unit (Person 4). Install as /etc/systemd/system/atlas-backend.service; see infra/README.md.
+# Runs ONE Fastify process: the flight cache, provider refresh gate and rate limiter are per-process.
+[Unit]
+Description=Atlas backend (Fastify API)
+Documentation=file:///opt/atlas/infra/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=atlas
+Group=atlas
+WorkingDirectory=/opt/atlas/backend
+# Secrets and settings are injected here (root-owned, mode 0640, group atlas), never from the repo. Names only
+# are documented in infra/.env.example. No backend/.env exists on the server.
+EnvironmentFile=/etc/atlas/backend.env
+ExecStart=/usr/bin/node dist/server.js
+# server.ts handles SIGTERM: stops accepting, cancels in-flight work, closes the pool, and force-exits after 15 s.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# Hardening: read-only system, no home access, nothing to write except its own journal output.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target
