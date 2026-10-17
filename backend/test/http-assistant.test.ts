@@ -11,11 +11,12 @@ import {testContracts,TestRepository,protocolArticle,deferred} from './support.j
 
 const input={request_id:'http-test',message:'Explain the synthetic test record',timezone:'America/Toronto',filters:{}};
 const draft={answer:'Synthetic transport-test answer',citations:[{record_id:'test-record',source_id:'source-test-record'}],result_ids:['test-record'],actions:[]};
-async function server(model: Model,requestTimeoutMs=2000) {
-  const config=readConfig({NODE_ENV:'test',REQUEST_TIMEOUT_MS:String(requestTimeoutMs),AI_REQUEST_TIMEOUT_MS:'2000'});
+async function server(model: Model,requestTimeoutMs=2000,aiTimeoutMs=2000) {
+  const config=readConfig({NODE_ENV:'test',REQUEST_TIMEOUT_MS:String(requestTimeoutMs),AI_REQUEST_TIMEOUT_MS:String(aiTimeoutMs)});
   const contracts=testContracts(),repository=new TestRepository({news:[protocolArticle()],sources:[{id:'source-test-record',title:'Synthetic source',url:'https://example.invalid/test-record'}]});
   const retrieval=new Retrieval(contracts,repository),flights=new Flights(contracts,config,[]);
   const app=await buildApp(config,{contracts,repository,retrieval,flights,assistant:new Assistant(config,contracts,retrieval,flights,model)});
+  assert.ok(app.initialConfig.connectionTimeout! > requestTimeoutMs, 'socket inactivity must not preempt the structured HTTP deadline');
   const url=await app.listen({host:'127.0.0.1',port:0});
   return {app,url};
 }
@@ -30,6 +31,17 @@ test('a complete real HTTP JSON body is not mistaken for a disconnected assistan
     const response=await fetch(url+'/api/assistant',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)});
     assert.equal(response.status,200);const body=await response.json() as Record<string,unknown>;
     assert.equal(body.request_id,input.request_id);assert.equal(body.mode,'fixture');assert.equal(calls,1);
+  } finally {await app.close();}
+});
+test('a valid non-streaming assistant response survives more than ten seconds of socket inactivity',{timeout:15000},async()=>{
+  const {app,url}=await server({generate:async()=>{
+    await new Promise(resolve=>setTimeout(resolve,10500));
+    return {content:{role:'model',parts:[]},text:'',calls:[{name:'respond',args:draft}]};
+  }},13000,12000);
+  try {
+    const response=await fetch(url+'/api/assistant',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)});
+    assert.equal(response.status,200);
+    assert.equal((await response.json() as {mode:string}).mode,'fixture');
   } finally {await app.close();}
 });
 test('a real HTTP POST deadline returns structured 503 and aborts outstanding model work',{timeout:5000},async()=>{

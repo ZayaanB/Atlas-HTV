@@ -42,3 +42,18 @@ test('cancelled calls and undeclared forced tools cannot start an SDK request',a
   await assert.rejects(model.generate([],[{...declaration,description:'x'.repeat(config.aiMaxContextBytes)}],new AbortController().signal),/context bound/);
   assert.equal(requests,0);
 });
+test('production finalization requires declared tools and uses bounded output/thinking configuration', async () => {
+  const config=readConfig({NODE_ENV:'test',GEMINI_API_KEY:'synthetic-key',GEMINI_MODEL:'synthetic-model',GEMINI_THINKING_LEVEL:'low',AI_MAX_OUTPUT_TOKENS:'4096'});
+  const response=new GenerateContentResponse();
+  response.candidates=[{finishReason:FinishReason.STOP,content:{role:'model',parts:[{functionCall:{name:'respond',args:{}}}]}}];
+  const model=new Gemini(config,{models:{generateContent:async params=>{
+    assert.equal(params.config!.toolConfig!.functionCallingConfig!.mode,FunctionCallingConfigMode.ANY);
+    assert.equal(params.config!.maxOutputTokens,4096);
+    assert.equal(params.config!.thinkingConfig!.thinkingLevel,'LOW');
+    assert.equal(params.config!.automaticContinuation,false);
+    return response;
+  }}});
+  assert.equal((await model.generate([],[{name:'respond',parametersJsonSchema:{type:'object'}}],new AbortController().signal)).calls[0]!.name,'respond');
+  for (const env of [{AI_MAX_OUTPUT_TOKENS:'16385'},{AI_MAX_OUTPUT_TOKENS:'511'},{GEMINI_THINKING_LEVEL:'unbounded'}])
+    assert.throws(()=>readConfig(env),/Invalid/);
+});

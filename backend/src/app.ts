@@ -10,13 +10,16 @@ import { investigationsRoutes } from './routes/investigations.js';
 import { observationsRoutes } from './routes/observations.js';
 import { flightsRoutes } from './routes/flights.js';
 import { assistantRoutes } from './routes/assistant.js';
+import { workspaceRoutes } from './routes/workspace.js';
 declare module 'fastify' { interface FastifyRequest { atlasSignal: AbortSignal } }
 export async function buildApp(config: Config, injected?: Services) {
   const services = injected ?? await createServices(config);
   const controllers = new Set<AbortController>();
   const app = Fastify({
     logger: config.nodeEnv !== 'test' ? { level:'info', redact:['req.headers.authorization','req.headers.cookie','req.body','res.headers.set-cookie'] } : false,
-    logController:new LogController({disableRequestLogging:true}), bodyLimit:32768, requestTimeout:30000, connectionTimeout:10000,
+    // The socket inactivity timeout must outlast our processing deadline. A
+    // fixed 10 s timeout disconnected valid non-streaming Gemini responses.
+    logController:new LogController({disableRequestLogging:true}), bodyLimit:32768, requestTimeout:30000, connectionTimeout:config.requestTimeoutMs+1000,
     forceCloseConnections:'idle', trustProxy:false
   });
   await app.register(rateLimit, { max:config.rateMax,timeWindow:'1 minute',
@@ -69,6 +72,7 @@ export async function buildApp(config: Config, injected?: Services) {
   app.setNotFoundHandler((request,reply) => reply.code(404).send({error:{code:'NOT_FOUND',message:'Endpoint not found',retryable:false,request_id:request.id}}));
   healthRoutes(app,services); newsRoutes(app,services); locationsRoutes(app,services);
   investigationsRoutes(app,services); observationsRoutes(app,services); flightsRoutes(app,services); assistantRoutes(app,services);
+  workspaceRoutes(app,services,config);
   app.addHook('preClose',async () => { for (const controller of controllers) controller.abort(); });
   app.addHook('onClose', async () => { await services.flights.close(); await services.repository.close(); });
   return app;

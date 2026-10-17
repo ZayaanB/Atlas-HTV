@@ -35,7 +35,10 @@ export function modelParameters(contracts: Contracts,name: string): Data {
     }
     const projected: Data={};
     for (const [key,item] of Object.entries(schema)) {
-      if (['$schema','$id','$defs','definitions','$comment','additionalItems'].includes(key)) continue;
+      // Gemini's grammar compiler can reject cumulative array maxima in rich
+      // tool declarations. They are model hints only; the untouched authoritative
+      // schema still enforces every array bound before dispatch/finalization.
+      if (['$schema','$id','$defs','definitions','$comment','additionalItems','maxItems'].includes(key)) continue;
       if (['properties','patternProperties','dependentSchemas'].includes(key)) projected[key]=Object.fromEntries(Object.entries(object(item)).map(([property,child])=>[property,walk(child,base,next,depth+1)]));
       else if (['anyOf','oneOf','allOf'].includes(key) && Array.isArray(item)) projected[key]=item.map(child=>walk(child,base,next,depth+1));
       else if (key==='items' && Array.isArray(item)) {

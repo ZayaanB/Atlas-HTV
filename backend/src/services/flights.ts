@@ -8,6 +8,7 @@ export class Flights {
   private globalNext = 0;
   private shutdown = new AbortController();
   constructor(private contracts: Contracts, private config: Config, private regions: Data[], private provider?: FlightProvider, private clock = Date.now) {}
+  catalog(): Data[] { return this.regions.map(region => this.contracts.parse('FlightRegion', structuredClone(region), true)); }
   async get(raw: unknown, signal?: AbortSignal): Promise<Data> {
     const query = this.contracts.parse('FlightsQuery', raw);
     if (this.shutdown.signal.aborted) throw unavailable('SERVICE_CLOSING','Flight service is closing');

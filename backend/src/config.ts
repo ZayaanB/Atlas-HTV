@@ -25,6 +25,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
       throw new AppError('CONFIG_INVALID', 'DATABASE_URL must be PostgreSQL without TLS override parameters', 500);
   }
   const geminiKey = optional('GEMINI_API_KEY'), geminiModel = optional('GEMINI_MODEL');
+  const geminiThinkingLevel = optional('GEMINI_THINKING_LEVEL');
+  if (geminiThinkingLevel && !['minimal','low','medium','high'].includes(geminiThinkingLevel))
+    throw new AppError('CONFIG_INVALID','Invalid GEMINI_THINKING_LEVEL',500);
   const embeddingModel = optional('EMBEDDING_MODEL'), embeddingVersion = optional('EMBEDDING_VERSION');
   if (!!geminiKey !== !!geminiModel) throw new AppError('CONFIG_INVALID', 'Set both GEMINI_API_KEY and GEMINI_MODEL', 500);
   if (!!embeddingModel !== !!env.EMBEDDING_DIMENSIONS) throw new AppError('CONFIG_INVALID', 'Set both embedding model and dimensions', 500);
@@ -38,12 +41,13 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     databaseUrl, databaseCaFile: optional('DATABASE_CA_FILE'),
     contractsModule: optional('ATLAS_CONTRACTS_MODULE'), databaseModule: optional('ATLAS_DATABASE_MODULE'),
     sourceDefinitionsModule: optional('ATLAS_SOURCES_MODULE'),
-    geminiKey, geminiModel,
+    geminiKey, geminiModel, geminiThinkingLevel,
     embeddingModel, embeddingVersion: embeddingVersion ?? embeddingModel,
     embeddingDimensions: integer('EMBEDDING_DIMENSIONS', 768, 1, 3072),
     aiTimeoutMs: integer('AI_REQUEST_TIMEOUT_MS', 20000, 100, 60000),
     aiMaxTools: integer('AI_MAX_TOOL_CALLS', 8, 1, 16), aiMaxRounds: integer('AI_MAX_ROUNDS', 4, 1, 8),
     aiMaxContextBytes: integer('AI_MAX_CONTEXT_BYTES', 64000, 4000, 128000),
+    aiMaxOutputTokens: integer('AI_MAX_OUTPUT_TOKENS', 8192, 512, 16384),
     flightsEnabled: flag('FLIGHTS_ENABLED'),
     flightsRefreshMs: integer('FLIGHTS_REFRESH_INTERVAL_MS', 60000, 30000, 3600000),
     flightsStaleMs: integer('FLIGHTS_STALE_AFTER_MS', 120000, 1000, 3600000),

@@ -17,6 +17,13 @@ export function matchesNews(article: Data, query: Data): boolean {
 }
 export class Retrieval {
   constructor(readonly contracts: Contracts, readonly repository: Repository, private embeddings?: Embeddings) {}
+  async workspace(capabilities: Data, regions: Data[], signal?: AbortSignal): Promise<Data> {
+    const [catalog] = await this.repository.read('workspace', {}, signal);
+    if (!catalog) throw new AppError('DATA_UNAVAILABLE', 'Workspace catalog is unavailable', 503, true);
+    return this.contracts.parse('WorkspaceResponse', {
+      ...catalog, capabilities, flight_regions: regions
+    }, true);
+  }
   newsInput(raw: unknown): Data {
     const query = this.contracts.parse('NewsQuery', raw);
     range(query, 'published_from', 'published_to'); bounds(query.bounds); page(query);
