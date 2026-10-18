@@ -11,6 +11,8 @@ import "./AtlasMap.css";
 import { updateEvidence } from "./EvidenceLayer";
 import { updateFlights, FLIGHT_LAYERS } from "./FlightLayer";
 import { GLOBE_CENTER, homeZoom, homePadding } from "./style";
+import { installBuildings, startLocalMapPerspective, styleFor } from "./basemap";
+import { installMaterials } from "./materials";
 import { compactMapLabel, installStoryGlow, startStoryPulse, STORY_GLOW_ID } from "./news-points";
 import { IDLE_SPIN_EVENT, startIdleGlobeSpin } from './idle-spin';
 
@@ -24,7 +26,6 @@ const CLUSTER_COUNT_ID = "atlas-location-cluster-count";
 const POINT_ID = "atlas-location-points";
 const EXTENT_LABEL_ID = "atlas-extent-labels";
 const POINT_LABEL_ID = "atlas-point-labels";
-const SATELLITE_ZOOM = 8;
 
 type LocationProperties = {
   locationId: string;
@@ -130,15 +131,6 @@ export function makeLocations(
   }
 
   return { type: "FeatureCollection", features };
-}
-
-function styleFor(
-  preference: AtlasMapProps["basemap"],
-  zoom: number,
-): "map" | "satellite" {
-  if (preference === "satellite") return "satellite";
-  if (preference === "map") return "map";
-  return zoom >= SATELLITE_ZOOM ? "satellite" : "map";
 }
 
 function styleUrl(style: "map" | "satellite") {
@@ -435,6 +427,7 @@ export function AtlasMap(props: AtlasMapProps) {
     }
     mapRef.current = map;
 
+    const stopLocalPerspective = startLocalMapPerspective(map, () => propsRef.current.basemap);
     let firstStyleLoad = true;
     const installStyle = () => {
       styleReadyRef.current = true;
@@ -447,6 +440,8 @@ export function AtlasMap(props: AtlasMapProps) {
         "horizon-blend": 0.06,
         "star-intensity": 0.3,
       });
+      installMaterials(map, currentStyleRef.current);
+      installBuildings(map, currentStyleRef.current);
       installLocationLayers(map, dataRef.current);
       updateEvidence(map, propsRef.current.evidenceOverlay);
       updateFlights(map, propsRef.current);
@@ -611,6 +606,7 @@ export function AtlasMap(props: AtlasMapProps) {
     return () => {
       stopIdleSpin();
       stopStoryPulse();
+      stopLocalPerspective();
       canvasContainer.removeEventListener(
         "pointerdown",
         stopProgrammaticMotion,

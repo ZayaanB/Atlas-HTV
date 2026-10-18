@@ -170,6 +170,17 @@ describe("fixtures and queries", () => {
   });
 });
 describe("workspace transitions", () => {
+  it("starts in Map and preserves the basemap choice through viewport updates", () => {
+    const store = createWorkspaceStore();
+    expect(store.getState().basemap).toBe("map");
+    for (const zoom of [3, 8, 15, 18, 3]) {
+      store.getState().setViewport({ bounds: [-83, 35, -82, 36], center: [-82.5, 35.5], zoom });
+      expect(store.getState().basemap).toBe("map");
+    }
+    store.getState().setBasemap("satellite");
+    store.getState().requestCamera({ type: "return_to_globe" });
+    expect(store.getState().basemap).toBe("satellite");
+  });
   it("applies viewport bounds only on explicit search and preserves filters on return to globe", () => {
     const store = createWorkspaceStore();
     store.getState().applyFilters({ keyword: "flood" });
