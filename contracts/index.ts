@@ -7,6 +7,7 @@ import { assistantStreamEventSchema, type AssistantStreamEventContract } from ".
 import { researchSchemas, type ResearchContracts } from "./schemas/assistant-research.js";
 import type { FromSchema } from "json-schema-to-ts";
 import { newsQuerySchema } from "./schemas/api.js";
+import { windSchemas, type WindContracts } from "./schemas/wind.js";
 export {newsCategories, newsFiltering, matchesNewsCategories} from './schemas/news-categories.js';
 import {
   articleSchema,
@@ -27,6 +28,7 @@ import {
 
 // Existing backend handoff: each name is registered once with Ajv.addSchema(schema, name).
 export const schemas = {
+  ...windSchemas,
   ...featureSchemas,
   ...assistantV2Schemas,
   ...researchSchemas,
@@ -48,7 +50,7 @@ export type SchemaName = keyof typeof schemas;
 // Resolve schemas individually: inferring the entire registry as a generic union
 // makes TypeScript expand unrelated response schemas at every validation call.
 export type ContractMap = FeatureContracts &
-  AssistantV2Contracts & ResearchContracts & {
+  AssistantV2Contracts & ResearchContracts & WindContracts & {
     AssistantStreamEvent: AssistantStreamEventContract;
     NewsQuery: FromSchema<typeof newsQuerySchema>;
     Article: FromSchema<typeof articleSchema>;
@@ -74,6 +76,9 @@ export type LocationsQuery = Contract<"LocationsQuery">;
 export type NewsResponse = Contract<"NewsResponse">;
 export type LocationsResponse = Contract<"LocationsResponse">;
 export type ApiError = Contract<"ApiError">;
+export type WindQuery = Contract<"WindQuery">;
+export type WindSample = Contract<"WindSample">;
+export type WindResponse = Contract<"WindResponse">;
 
 export type Observation = Contract<"Observation">;
 export type ObservationSeries = Contract<"ObservationSeries">;
@@ -85,6 +90,9 @@ export type ObservationsResponse = Contract<"ObservationsResponse">;
 export type AircraftState = Contract<"AircraftState">;
 export type FlightsResponse = Contract<"FlightsResponse">;
 export type FlightRegion = Contract<"FlightRegion">;
+export type FlightAreaQuery = Contract<"FlightAreaQuery">;
+export type FlightAreaResponse = Contract<"FlightAreaResponse">;
+export type FlightGlobalResponse = Contract<"FlightGlobalResponse">;
 export type UIAction = Contract<"UIAction">;
 export type AssistantRequest = Contract<"AssistantRequest">;
 export type AssistantResponse = Contract<"AssistantResponse">;

@@ -9,6 +9,7 @@ import { locationsRoutes } from './routes/locations.js';
 import { investigationsRoutes } from './routes/investigations.js';
 import { observationsRoutes } from './routes/observations.js';
 import { flightsRoutes } from './routes/flights.js';
+import { windRoutes } from './routes/wind.js';
 import { assistantRoutes } from './routes/assistant.js';
 import { workspaceRoutes } from './routes/workspace.js';
 declare module 'fastify' { interface FastifyRequest { atlasSignal: AbortSignal } }
@@ -77,7 +78,8 @@ export async function buildApp(config: Config, injected?: Services) {
   healthRoutes(app,services); newsRoutes(app,services); locationsRoutes(app,services);
   investigationsRoutes(app,services); observationsRoutes(app,services); flightsRoutes(app,services); assistantRoutes(app,services);
   workspaceRoutes(app,services,config);
+  windRoutes(app,services);
   app.addHook('preClose',async () => { for (const controller of controllers) controller.abort(); });
-  app.addHook('onClose', async () => { await services.flights.close(); await services.repository.close(); });
+  app.addHook('onClose', async () => { await services.wind?.close(); await services.flights.close(); await services.repository.close(); });
   return app;
 }

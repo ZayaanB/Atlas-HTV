@@ -6,7 +6,7 @@ Implementation is authorized for this workstream. This directory now contains a 
 
 **Current runtime (2026-10-17, main `9b592cd`):** all 24 required shared schemas and all 11 frozen database plans load. Tiger-backed health, news, locations, investigation, raw observations and endpoint comparisons pass live HTTP checks. The new optional `/api/workspace` catalog returns stored theme/entity labels and explicit article-to-investigation associations, so the frontend can discover Helene research automatically. Its SQL lives in `backend/src/data/workspace.ts` and uses the frozen `atlas-p3-v1` tables; no teammate migration or contract was changed.
 
-The existing Tiger DEV service has 21 articles, 7,467 historical observations and one reviewed Helene investigation. TLS uses the supplied CA and least-privilege `atlas_runtime` credentials in ignored `backend/.env`. The Gemini SDK, bounded tool loop, source-citation validation and authorized actions are integrated with Person 1's new schemas. Live generation results and current provider limitations are recorded in [Gemini integration](docs/gemini-integration.md). Stored historical records are not live reporting. Embeddings remain unconfigured; flights remain disabled pending provider-use review. No resources were provisioned or deployed.
+The existing Tiger DEV service has 21 articles, 7,467 historical observations and one reviewed Helene investigation. TLS uses the supplied CA and least-privilege `atlas_runtime` credentials in ignored `backend/.env`. The Gemini SDK, bounded tool loop, source-citation validation and authorized actions are integrated with Person 1's new schemas. Live generation results and current provider limitations are recorded in [Gemini integration](docs/gemini-integration.md). Stored historical records are not live reporting. Embeddings remain unconfigured. Flights require explicit enablement; ADSB.lol additionally requires a contact User-Agent and passed an earlier live adapter check. AirLabs global integration and its bounded live result are described below. No resources were provisioned or deployed.
 
 ## Run locally
 
@@ -44,6 +44,14 @@ The explicit `setup:tiger` command connects to an existing READY DEV service usi
 
 ## What is implemented
 
+Wind is available through `GET /api/wind?bounds=west,south,east,north`, independent of the news database and Gemini. Rebuild shared contracts and restart the backend after pulling this addition. `WIND_ENABLED=false` disables provider access; the UI toggle defaults off, and neither startup nor tests fetch wind automatically.
+
+The fixed Open-Meteo forecast endpoint supplies current modelled wind at 10 m in km/h and meteorological **from** degrees. Each request samples nine points in the supplied view, supports antimeridian bounds, preserves requested and provider grid coordinates separately, and returns UTC model-valid and fetch times. Missing speeds are omitted; missing directions remain null. This is coarse model context, not street-level measurements or dated event evidence.
+
+The memory cache coalesces viewers, refreshes on demand after 15 minutes, marks cached/failing data stale, and expires it after an hour. A shared 10-second gate, rolling 4,500-location/hour and 9,000-location/day budgets, 64-view cache bound, timeout, body-size bound and provider Retry-After/backoff limit usage. Each batched location counts toward the budget. No background requests start without viewers; an already-started shared request can finish after a client disconnects. One backend process owns these budgets; multiple processes require a shared limiter before deployment.
+
+Source and licensing: [Open-Meteo forecast docs](https://open-meteo.com/en/docs), [CC BY 4.0 attribution](https://open-meteo.com/en/licence), [free non-commercial service terms and limits](https://open-meteo.com/en/terms). No API key is needed for the non-commercial prototype. Commercial use requires a separately reviewed provider arrangement; no subscription or deployment is configured here.
+
 | Area | Behavior | External dependency |
 | --- | --- | --- |
 | Health | `/api/health/live` is process liveness; `/api/health` checks contracts, core query-plan availability, repository mode and database connectivity | Full contracts, core plans and configured database for readiness |
@@ -52,9 +60,21 @@ The explicit `setup:tiger` command connects to an existing READY DEV service usi
 | Gemini | Official `@google/genai`, manual allowlisted dispatch, bounded multi-turn function responses, source-linked answers, validated UI actions | Available model/key and a sourced dataset |
 | Embeddings | Query/document task separation, model/version/dimension/hash identity, changed-chunk indexing, filtered vector adapter and explicit keyword fallback | Available model/key; approved chunk permissions; pgvector schema/query plan |
 | Imports | Fixed GDELT endpoint and reviewed RSS definitions; normalization, URL deduplication, provenance, permission checks, transactions and stored refresh/backoff metadata | Reviewed sources/rights and import SQL plans |
-| Flights | Bounded ADSB.lol point adapter; shared cache, request coalescing, global refresh gate, Retry-After/backoff, stale/expiry metadata | Reviewed terms/polling, shared AircraftState/region schemas and configured regions |
+| Flights | AirLabs global snapshots/shared observations/persistent attempt budget, or ADSB.lol region/map-area cache; coalescing, backoff and freshness | Explicit provider enablement; backend key for AirLabs or contact for ADSB.lol; separately authorized live acceptance |
 
-The current timeline response says `aggregation: "raw"`. It does **not** claim a continuous aggregate is wired. Person 4 must supply the aggregate and its units/period semantics before a bucketed response is added. Flight cache is process-shared, demand-driven, and memory-only. Run one backend process for the current quota model; a multi-process/shared fleet cache is not implemented. No aircraft history or flight routes/status are stored or inferred. Empty results do not establish empty airspace.
+The current timeline response says `aggregation: "raw"`. It does **not** claim a continuous aggregate is wired. Person 4 must supply the aggregate and its units/period semantics before a bucketed response is added. Flight cache is process-shared, demand-driven, and memory-only. Run one backend process for the current quota model; a multi-process/shared fleet cache is not implemented. ADSB.lol regional history is not stored. The optional AirLabs global service retains 30 minutes of observed positions in memory; it does not infer full flown routes. Empty results do not establish empty airspace.
+
+The new `/api/flights/area` consumer supports exploring arbitrary bounded circles,
+registration/type metadata and explicit truncation. Person 1 has supplied the
+shared area schemas; no private fallback schemas are installed. To activate the
+adapter, set `FLIGHTS_ENABLED=true` and `FLIGHTS_CONTACT` to your real contact email
+or HTTPS URL in private `backend/.env`, then restart. The contact is sent in
+`User-Agent: Atlas/0.1 (contact: VALUE)`; the default Node User-Agent was rejected
+with 403 while a live contact-bearing diagnostic returned 200. Contact remains
+server-side. Two cache slots share a fair global 30-second gate, with a 60-second
+per-area target. Example settings leave flights disabled. Exact contracts, frontend toggle/session-trail
+requirements, map animation behavior and activation checks are in the
+[flight-area handoff](docs/flights-area-handoff.md).
 
 ## API integration
 
@@ -149,3 +169,32 @@ result IDs. Missing observations retain their values/nulls and return a limitati
 Run `AI_REQUEST_TIMEOUT_MS=60000 npm --prefix backend run verify:gemini` for the explicit live two-turn diagnostic (uses generation quota). It checks canonical news tool calling and citation resolution separately from the public assistant. The public route uses the shared `AssistantRequest`, `AssistantDraft` and `AssistantResponse`, server-resolved URLs/titles, and validated `set_filters` / `focus_location` actions only when authorized. See [Gemini integration evidence and test steps](docs/gemini-integration.md).
 
 Valid JSON assistant POSTs use Atlas-owned lifecycle cancellation: request-body completion does not trigger a false disconnect. Real HTTP tests cover successful responses, structured timeout 503s and client disconnects. Provider errors/fallbacks leave manual filtering available and never return pending actions. API mode never silently switches to fixtures.
+
+### Global airline demo (AirLabs)
+
+Person 4: follow the [flight deployment handoff](docs/flight-deployment-handoff.md) for the required persistent systemd state directory, private environment, quota preservation, and bounded hosted acceptance. Flights need no new database migration or cron job; the current service unit needs a writable ledger directory before AirLabs can run.
+
+The global backend, shared `FlightGlobalResponse`, compatible aircraft extensions,
+`flight_global` capability and global frontend/map are delivered and synthetically
+verified. Rebuild contracts before restarting the backend. A process loading an
+older registry still fails closed without spending provider quota. Global clients
+prefer `flight_global` even with both legacy flags false and never fall back to
+regional data or fixtures after a global failure. See the
+[authoritative flight handoff](docs/flights-area-handoff.md) for exact interfaces.
+
+Use private `AIRLABS_API_KEY`, `FLIGHTS_PROVIDER=airlabs`, `FLIGHTS_ENABLED=true`,
+then restart. One shared snapshot refreshes every five minutes on demand, with
+30-minute observed trails. The private persistent ledger under `.flight-budget/`
+caps this deployment at 900 total upstream attempts across restarts; do not reset
+it. Optional `FLIGHTS_BUDGET_DIRECTORY` should point to durable private storage.
+No provider request occurs on startup. The regional ADSB.lol settings do not tune
+this global cache. AirLabs does not require ADSB.lol contact configuration.
+
+This is partial provider-covered airline traffic. Automated tests use injected
+data, including actual shared-schema/backend compatibility. The authorized live
+check verified two shared refreshes across desktop/mobile viewers with ledger delta
++2, correct aircraft details and server trails. Both viewers were disabled; the
+backend is left stopped to preserve the bound. Native-control interruptions delayed
+UI cleanup and left live Back/dated-evidence acceptance incomplete. See the handoff's
+[live result](docs/flights-area-handoff.md#live-result--october-18-2026) for exact
+timestamps, counts, limitations and cleanup; this is not a complete live UI pass.

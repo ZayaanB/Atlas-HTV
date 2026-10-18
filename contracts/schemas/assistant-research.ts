@@ -4,6 +4,7 @@ import { newsQuerySchema } from './api.js';
 import { locationsQuerySchema } from './responses.js';
 import { articleSchema, sourceSchema } from './records.js';
 import { observationSchema, seriesSchema, evidenceSchema } from './workspace.js';
+import { assistantFilterPatchSchema } from './assistant-v2.js';
 
 const shape = <N extends string, const P extends Record<string, object>, const R extends readonly (keyof P & string)[]>(name: N, properties: P, required: R) => ({
   $schema: draft, $id: `https://atlas.invalid/contracts/${name}`, type: 'object', properties, required, additionalProperties: false,
@@ -75,7 +76,7 @@ export const researchSchemas = {
       action_type: { enum: ['set_filters', 'focus_location', 'open_timeline', 'suggest_timeline'] },
       location_id: recordId, investigation_id: recordId, series_id: recordId,
       observed_from: nullableUtcDateTime, observed_to: nullableUtcDateTime,
-      changed_keys: { type: 'array', items: { type: 'string', maxLength: 50 }, maxItems: 10 },
+      changed_keys: assistantFilterPatchSchema.properties.clear,
       reference: { type: 'string', maxLength: 64 }, already_in_context: { type: 'boolean' },
     }, additionalProperties: false },
     comparison: { anyOf: [{ type: 'object', properties: {

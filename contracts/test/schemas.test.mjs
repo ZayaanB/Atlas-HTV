@@ -751,6 +751,15 @@ test("research tools have strict bounded arguments without changing manual query
   ]) invalid(name, value);
 });
 
+test("filter receipts accept complete resets and reject unsupported or repeated keys", () => {
+  const keys = schemas.AssistantFilterPatch.properties.clear.items.enum;
+  const receipt = { kind: "receipt", items: [], returned_count: 0, truncated: false,
+    receipt: { action_type: "set_filters", changed_keys: keys } };
+  valid("AssistantToolResult", receipt);
+  invalid("AssistantToolResult", { ...receipt, receipt: { ...receipt.receipt, changed_keys: ["sql"] } });
+  invalid("AssistantToolResult", { ...receipt, receipt: { ...receipt.receipt, changed_keys: ["keyword", "keyword"] } });
+});
+
 test("compact research results preserve nullable dates and qualifiers while rejecting record dumps", () => {
   const record = {
     id: knownArticle.id, record_type: "article", title: knownArticle.title,
@@ -770,4 +779,42 @@ test("compact research results preserve nullable dates and qualifiers while reje
   invalid("AssistantToolResult", { ...result, investigation: {} });
   invalid("AssistantToolResult", { ...result, receipt: { filters: {} } });
   invalid("AssistantToolResult", { ...result, exchanges: [{ index: 0, user: "Question", assistant: "a".repeat(4001) }] });
+});
+
+test('flight area schemas are strict, bounded and legacy identity fields remain optional', async () => {
+  const query = { latitude: 43.71, longitude: -79.41, radius_nm: 97 };
+  valid('FlightAreaQuery', query);
+  for (const value of [{ ...query, latitude: 91 }, { ...query, longitude: Infinity }, { ...query, radius_nm: 0 }, { ...query, radius_nm: 100.1 }, { ...query, radius_nm: '100' }, { ...query, extra: true }, {}]) invalid('FlightAreaQuery', value);
+  const stamp = '2026-10-17T12:00:00Z';
+  const aircraft = { id:'abc123',provider:'adsb.lol',callsign:null,coordinates:[-79.4,43.7],altitude:null,altitude_unit:'ft',altitude_reference:'barometric',speed:null,speed_unit:'kn',heading:null,observed_at:stamp,fetched_at:stamp,source_url:'https://example.invalid/synthetic',license:'ODbL-1.0' };
+  valid('AircraftState', aircraft);
+  valid('AircraftState', { ...aircraft,registration:null,aircraft_type:null,operator:null,on_ground:null });
+  valid('AircraftState', { ...aircraft,registration:'C-TEST',aircraft_type:'B738',operator:null,on_ground:true });
+  for (const value of [{registration:' A '},{registration:'X'.repeat(33)},{aircraft_type:'X'.repeat(17)},{on_ground:'ground'}]) invalid('AircraftState',{...aircraft,...value});
+  const area = {id:'area-43.7--79.4-100',latitude:43.7,longitude:-79.4,radius_nm:100};
+  const response = { area,items:[aircraft],fetched_at:stamp,status:'ready',stale:false,truncated:false,mode:'live',replay:false,attribution:'Synthetic contract test',retry_at:stamp,error:null };
+  valid('FlightAreaResponse',response);
+  valid('FlightAreaResponse',{...response,items:Array(500).fill(aircraft)});
+  for (const status of ['waiting','unavailable']) valid('FlightAreaResponse',{...response,status,items:[],fetched_at:null,stale:true});
+  for (const value of [{items:Array(501).fill(aircraft)},{status:'empty'},{extra:true},{retry_at:'2026-10-17T12:00:00-04:00'},{truncated:null}]) invalid('FlightAreaResponse',{...response,...value});
+  const research = JSON.parse(await readFile(new URL('../examples/helene-research.json',import.meta.url),'utf8'));
+  valid('WorkspaceResponse', research.workspace);
+  valid('WorkspaceResponse', {...research.workspace,capabilities:{...research.workspace.capabilities,flight_areas:true}});
+  valid('FlightsResponse',{items:[aircraft],region_id:'legacy',fetched_at:stamp,stale:false,mode:'live',replay:false,attribution:'Synthetic test',retry_at:stamp,error:null});
+});
+
+test('global AirLabs contracts enforce UTC, coordinates, every required field and safety limits', async () => {
+  const time = '2026-10-17T12:00:00Z';
+  const aircraft = {id:'abc123',provider:'airlabs',callsign:null,registration:null,aircraft_type:null,operator:null,on_ground:false,coordinates:[-79,43],altitude:1000,altitude_unit:'m',altitude_reference:'unknown',speed:null,speed_unit:'kn',heading:0,direction_kind:'direction',flight_iata:'AB12',airline_icao:null,airline_iata:null,departure_iata:'YYZ',arrival_iata:null,observed_at:time,fetched_at:time,source_url:'https://airlabs.co/',license:'AirLabs-terms'};
+  const point = {coordinates:[-79,43],observed_at:time,callsign:null,flight_iata:null};
+  const trail = {aircraft_id:'abc123',points:[point]};
+  const response = {snapshot_id:'airlabs-1792238400000',items:[aircraft],trails:[trail],fetched_at:time,status:'ready',stale:false,truncated:false,mode:'live',replay:false,attribution:'Synthetic protocol',retry_at:time,pause_reason:null,error:null};
+  valid('AircraftState',aircraft); valid('FlightGlobalResponse',response);
+  valid('FlightGlobalResponse',{...response,items:Array(25000).fill(aircraft),trails:Array(25000).fill({...trail,points:Array(8).fill(point)})});
+  for (const status of ['waiting','unavailable']) valid('FlightGlobalResponse',{...response,status,items:[],trails:[],snapshot_id:null,fetched_at:null,retry_at:null,pause_reason:'quota'});
+  for (const key of Object.keys(response)) { const copy={...response}; delete copy[key]; invalid('FlightGlobalResponse',copy); }
+  for (const change of [{items:Array(25001).fill(aircraft)},{trails:Array(25001).fill(trail)},{trails:[{...trail,points:Array(9).fill(point)}]},{extra:true},{pause_reason:'billing'},{retry_at:'2026-02-30T00:00:00Z'},{fetched_at:'2026-10-17T12:00:00+00:00'},{trails:[{...trail,points:[{...point,coordinates:[181,0]}]}]},{trails:[{...trail,points:[{...point,observed_at:'invalid'}]}]},{trails:[{...trail,points:[{...point,extra:1}]}]},{trails:[{...trail,extra:true}]}]) invalid('FlightGlobalResponse',{...response,...change});
+  for (const change of [{coordinates:[0,91]},{altitude_unit:'km'},{provider:'other'},{license:'unknown'},{direction_kind:'heading'},{flight_iata:'x'.repeat(33)},{airline_icao:12},{departure_iata:[]},{extra:true}]) invalid('AircraftState',{...aircraft,...change});
+  const research=JSON.parse(await readFile(new URL('../examples/helene-research.json',import.meta.url),'utf8'));
+  valid('WorkspaceResponse',{...research.workspace,capabilities:{...research.workspace.capabilities,flights:false,flight_areas:false,flight_global:true}});
 });

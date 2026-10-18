@@ -65,7 +65,7 @@ async function send(message: string) {
   });
   await userEvent.click(screen.getByRole("button", { name: /Send question/ }));
 }
-it("explicit actions navigate atomically, preserve filters/chat/aircraft, and reopen the same investigation with a fresh series/range", async () => {
+it("explicit actions preserve filters/chat, clear an inactive aircraft highlight, and reopen the investigation with a fresh series/range", async () => {
   useWorkspace.getState().applyFilters({ themes: ["flooding"] });
   useWorkspace.getState().selectAircraft("aircraft-independent");
   const fixture = createFixtureApi(),
@@ -96,9 +96,7 @@ it("explicit actions navigate atomically, preserve filters/chat/aircraft, and re
   await screen.findByRole("region", { name: "Historical timeline" });
   const firstId = useWorkspace.getState().timelineIntent!.id;
   expect(useWorkspace.getState().filters.themes).toEqual(["flooding"]);
-  expect(useWorkspace.getState().selectedAircraftId).toBe(
-    "aircraft-independent",
-  );
+  expect(useWorkspace.getState().selectedAircraftId).toBeNull();
   expect(useWorkspace.getState().cameraCommand).toBeNull();
   expect(screen.getByText(/Active range/)).toHaveTextContent(
     target.observed_from,

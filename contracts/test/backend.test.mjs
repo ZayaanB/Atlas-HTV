@@ -463,3 +463,81 @@ test("all real v2 and bounded research schemas compile in backend registry and p
     assert.equal(JSON.stringify(projected).includes('"$ref"'), false);
   }
 });
+
+test('actual area contracts activate the injected flight service and validate normalized identity, waiting and unavailable responses', async () => {
+  const { Flights } = await import('../../backend/src/services/flights.ts');
+  const { AdsbLol } = await import('../../backend/src/data/providers/adsblol.ts');
+  let now = Date.parse('2026-10-17T12:00:00Z');
+  const config = readConfig({NODE_ENV:'test',FLIGHTS_ENABLED:'true',FLIGHTS_CONTACT:'test@example.invalid'});
+  const fetcher = async () => new Response(JSON.stringify({now,ac:[{hex:'abc123',lat:43.7,lon:-79.4,seen_pos:0,flight:' TEST ',r:' C-TEST ',t:' B738 ',alt_baro:'ground',gs:0,track:0}]}));
+  // Synthetic provider payload, injected fetch: no external HTTP or database connection.
+  const adapter = new AdsbLol(contracts,1000,'test@example.invalid',fetcher,()=>now);
+  const flights = new Flights(contracts,config,[],adapter,()=>now);
+  try {
+    assert.equal(flights.areaAvailable,true);
+    const ready=await flights.area({latitude:43.71,longitude:-79.41,radius_nm:97});
+    contracts.parse('FlightAreaResponse',ready,true);
+    assert.equal(ready.status,'ready');assert.deepEqual(ready.area,{id:'area-43.7--79.4-100',latitude:43.7,longitude:-79.4,radius_nm:100});
+    assert.equal(ready.items[0].registration,'C-TEST');assert.equal(ready.items[0].aircraft_type,'B738');assert.equal(ready.items[0].operator,null);assert.equal(ready.items[0].on_ground,true);
+    assert.equal(ready.items[0].heading,0);assert.equal(ready.items[0].altitude,null);
+    const waiting=await flights.area({latitude:40,longitude:-74,radius_nm:100});
+    contracts.parse('FlightAreaResponse',waiting,true);assert.equal(waiting.status,'waiting');assert.equal(waiting.fetched_at,null);
+    now+=120000;
+  } finally { await flights.close(); }
+  const unavailable = new Flights(contracts,config,[],{region:async()=>[],area:async()=>{throw new Error('Synthetic outage');}},()=>now);
+  try {
+    const result=await unavailable.area({latitude:0,longitude:0,radius_nm:5});
+    contracts.parse('FlightAreaResponse',result,true);assert.equal(result.status,'unavailable');assert.equal(result.fetched_at,null);assert.equal(result.stale,true);
+  } finally { await unavailable.close(); }
+});
+
+test('actual AirLabs adapter, global service and HTTP discovery use shared schemas with no account metadata', async () => {
+  const { AirLabs } = await import('../../backend/src/data/providers/airlabs.ts');
+  const { GlobalFlights } = await import('../../backend/src/services/global-flights.ts');
+  const { Flights } = await import('../../backend/src/services/flights.ts');
+  const { buildApp } = await import('../../backend/src/app.ts');
+  let now = Date.parse('2026-10-17T12:00:00Z'), requests = 0, attempts = 0;
+  const config = readConfig({ NODE_ENV:'test', FLIGHTS_ENABLED:'true', FLIGHTS_PROVIDER:'airlabs', AIRLABS_API_KEY:'synthetic-key' });
+  const adapter = new AirLabs(contracts, 'synthetic-key', 1000, async () => {
+    requests++;
+    return new Response(JSON.stringify({ request:{key:'synthetic-key'},account:{type:'private-account'}, response:[
+      {hex:'abc123',lat:43,lng:-79,updated:now/1000,status:'en-route',flight_icao:' TEST ',flight_iata:'AB12',airline_icao:'ABC',airline_iata:'AB',dep_iata:'YYZ',arr_iata:'YVR',alt:1000,dir:0},
+      {hex:'def456',lat:42,lng:-78,updated:now/1000,status:'en-route'}
+    ] }));
+  },()=>now);
+  const global = new GlobalFlights(contracts,adapter,{reserve:async()=>{attempts++;}},()=>now);
+  const flights = new Flights(contracts,config,[],undefined,()=>now,global);
+  const repository = {mode:'fixture',async read(name) {if(name==='workspace') return [{themes:[],entities:[],investigations:[]}]; return [];},async close(){}};
+  const retrieval = new Retrieval(contracts,repository);
+  const app = await buildApp(config,{contracts,repository,retrieval,flights,assistant:new Assistant(config,contracts,retrieval,flights)});
+  try {
+    const catalog=(await app.inject({url:'/api/workspace'})).json();
+    contracts.parse('WorkspaceResponse',catalog,true);
+    assert.equal(catalog.capabilities.flight_global,true);assert.equal(catalog.capabilities.flights,false);assert.equal(catalog.capabilities.flight_areas,false);
+    assert.equal(attempts,0);
+    const invalid=await app.inject({url:'/api/flights/global?zoom=1'});assert.equal(invalid.statusCode,400);assert.equal(attempts,0);
+    const [a,b]=await Promise.all([app.inject({url:'/api/flights/global'}),app.inject({url:'/api/flights/global'})]);
+    assert.equal(a.statusCode,200);assert.equal(a.headers['cache-control'],'no-store');assert.deepEqual(a.json(),b.json());assert.equal(requests,1);assert.equal(attempts,1);
+    const response=contracts.parse('FlightGlobalResponse',a.json(),true),item=response.items[0];
+    assert.equal(item.altitude_unit,'m');assert.equal(item.altitude_reference,'unknown');assert.equal(item.speed,null);assert.equal(item.direction_kind,'direction');assert.equal(item.heading,0);
+    assert.equal(item.airline_icao,'ABC');assert.equal(item.departure_iata,'YYZ');assert.equal(response.items[1].callsign,null);assert.equal(response.items[1].operator,null);
+    assert.ok(!/synthetic-key|private-account|account|api_key/.test(a.body));
+    now+=300_000;
+    const second=contracts.parse('FlightGlobalResponse',(await app.inject({url:'/api/flights/global'})).json(),true);
+    assert.notEqual(second.snapshot_id,response.snapshot_id);assert.equal(second.trails[0].points.length,2);assert.equal(requests,2);
+  } finally {await app.close();}
+  for (const [code,pause_reason] of [['AIRLABS_AUTH','authentication'],['FLIGHT_QUOTA','quota'],['FLIGHT_LEDGER','configuration'],['NETWORK','unavailable']]) {
+    const service=new GlobalFlights(contracts,{snapshot:async()=>{throw Object.assign(new Error('private provider body'),{code});}},{reserve:async()=>{}},()=>now);
+    try {
+      const response=contracts.parse('FlightGlobalResponse',await service.get(),true);
+      assert.equal(response.status,'unavailable');assert.equal(response.snapshot_id,null);assert.equal(response.fetched_at,null);assert.deepEqual(response.items,[]);assert.deepEqual(response.trails,[]);
+      assert.equal(response.pause_reason,pause_reason==='unavailable'?null:pause_reason);
+      assert.equal(response.retry_at===null,pause_reason!=='unavailable');assert.ok(!JSON.stringify(response).includes('private provider body'));
+    } finally {await service.close();}
+  }
+  // Deliberately omit the new export to verify fail-closed behavior after activation.
+  const {FlightGlobalResponse: omitted,...legacy}=schemas;
+  let reserved=0;
+  const absent=new GlobalFlights(new Contracts(legacy),{snapshot:async()=>{throw new Error('must not call');}},{reserve:async()=>{reserved++;}});
+  try {await assert.rejects(absent.get(),/contracts/);assert.equal(reserved,0);} finally {await absent.close();}
+});

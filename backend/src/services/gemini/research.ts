@@ -16,6 +16,7 @@ export interface ResearchPorts {
 interface Definition { schema: string; description: string; read(args: Data, signal: AbortSignal): Promise<ResearchPage> }
 const pick = (record: Data, keys: string[]): Data => Object.fromEntries(keys.filter(key => record[key] !== undefined).map(key => [key, record[key]]));
 const common = ['id', 'source_id', 'source_ids', 'published_at', 'published_date', 'publication_time_basis', 'event_at', 'verification_status'];
+export const keywordFallbackLimitation = 'Semantic search was unavailable; literal keyword matching was used and may miss relevant reporting.';
 
 export function projectRecord(record: Data, type: string, preview = false, args: Data = {}): Data {
   const fields: Record<string, string[]> = {
@@ -59,7 +60,10 @@ export class ResearchTools {
     this.registry = {
       search_news: { schema: 'AssistantNewsSearchArgs', description: 'Search inside active workspace filters. Default 3, max 5 previews. Fetch details with get_article; page with offset.', read: async (args, signal) => {
         const result = await ports.news({ ...args, limit: args.limit ?? 3, offset: args.offset ?? 0 }, signal);
-        return this.page('news', records(result.items), 'article', { ...args, offset: 0 }, true, { page_returned_count: records(result.items).length }, Number(args.offset ?? 0));
+        return this.page('news', records(result.items), 'article', { ...args, offset: 0 }, true, {
+          page_returned_count: records(result.items).length,
+          ...(result.search_mode === 'keyword_fallback' ? { limitation: keywordFallbackLimitation } : {}),
+        }, Number(args.offset ?? 0));
       } },
       get_article: { schema: 'AssistantArticleReadArgs', description: 'Read one selected, linked, or searched article. Only the stored permitted excerpt exists; page it with excerpt_offset/excerpt_limit. Null means unavailable.', read: async (args, signal) => {
         const article = await ports.article(string(args.id), signal);
@@ -166,12 +170,13 @@ export class ResearchTools {
     const more = start + consumed < source.length || (externalOffset !== undefined && consumed === count);
     result.next_offset = more && wireOffset + consumed <= 10000 ? wireOffset + consumed : null;
     if (more) result.truncated = true;
-    if (externalOffset !== undefined && more && !result.limitation) result.limitation = 'Continuation may return an empty page. Returned-page counts are not corpus totals.';
+    if (externalOffset !== undefined && more) result.limitation = [result.limitation,
+      'Continuation may return an empty page. Returned-page counts are not corpus totals.'].filter(Boolean).join(' ');
     // Discovery and source metadata cannot make an unseen fact citation-eligible.
     return this.valid(result, ['catalog', 'investigation', 'source'].includes(type) ? [] : evidence);
   }
-  receipt(value: Data, pageCount?: number): ResearchPage {
+  receipt(value: Data, pageCount?: number, limitation?: string): ResearchPage {
     return this.valid({ kind: 'receipt', items: [], returned_count: 0, truncated: false, receipt: value,
-      ...(pageCount === undefined ? {} : { page_returned_count: pageCount }) }, []);
+      ...(pageCount === undefined ? {} : { page_returned_count: pageCount }), ...(limitation ? { limitation } : {}) }, []);
   }
 }

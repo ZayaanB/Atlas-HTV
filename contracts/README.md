@@ -23,6 +23,11 @@ Additional foundation contracts: `LocationsQuery`, `NewsResponse`, `LocationsRes
 
 Research search/page arguments permit at most five records, source IDs at most five, and history reads at most two complete exchanges. Compact records exclude source URLs, full investigation bodies and geometry. Original publication/observation dates, nulls, qualifiers, precision, units and explicit truncation/paging metadata remain available. The backend separately enforces 8,000 serialized bytes per reply and a 48,000-byte assembled working prompt. Numeric/type/schema bounds are runtime validation, without coercion or unknown-field stripping. See [research behavior and extension guide](../backend/docs/assistant-research.md).
 
+Filter-action receipt `changed_keys` reuses `AssistantFilterPatch.clear`'s supported
+key set and bound, so complete 12-key resets validate while unknown/duplicate keys
+are rejected. Semantic-search fallback uses the existing compact `limitation` and
+public response `errors` fields; no separate response shape is introduced.
+
 ## Build and checks
 
 From the repository root, with Node >=22.12:
@@ -100,7 +105,7 @@ These checks import the actual backend loader, query normalizer, article normali
 
 Additional contracts: `Investigation`, `InvestigationResponse`, `InvestigationQuery`, `Evidence`, `ObservationSeries`, `Observation`, `ObservationsQuery`, `ObservationsResponse`, `CompareObservationsArgs`, `AssistantRequest`, `AssistantDraft`, `AssistantResponse`, `UIAction`, `FocusLocationArgs`, `FlightRegion`, `FlightsQuery`, `FlightsResponse`, `FindAircraftArgs`, `AircraftState`, and `WorkspaceResponse`.
 
-`WorkspaceResponse` remains optional catalog metadata for explicit article/investigation associations, option labels, and reviewed flight regions. Assistant and timeline access do not depend on this endpoint or its legacy context/series capability flags. Existing flight definitions are unchanged; no permissive readiness placeholders are added.
+`WorkspaceResponse` remains optional catalog metadata for explicit article/investigation associations, option labels, and flight capabilities. Assistant and timeline access do not depend on this endpoint or its legacy context/series flags. Legacy flight payloads remain valid. Area queries use strict `FlightAreaQuery`/`FlightAreaResponse` and optional `flight_areas`. Global clients prefer optional `flight_global`, even with both legacy flags false. `FlightGlobalResponse` requires the snapshot/status/freshness/pause metadata plus up to 25,000 aircraft and 25,000 eight-point histories. Aircraft accept the handoff's AirLabs provenance, meter/unknown altitude, direction semantics and optional nullable flight/airline/airport identifiers. Normal builds export all schemas, JSON and inferred types. See the [authoritative global handoff](../backend/docs/flights-area-handoff.md) and [frontend verification](../frontend/docs/flights-overlay.md).
 
 ### Assistant v2
 
