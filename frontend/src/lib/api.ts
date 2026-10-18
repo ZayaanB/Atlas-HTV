@@ -65,6 +65,12 @@ export function normalizeNewsQuery(query: NewsQuery): NewsQuery {
     limit: query.limit ?? 50,
     offset: query.offset ?? 0,
   };
+  const canonical = <T extends string>(values: T[] | undefined) => values?.length ? [...new Set(values)].sort() : undefined;
+  const events = canonical(normalized.event_types), topics = canonical(normalized.topics);
+  if (events) normalized.event_types = events;
+  else delete normalized.event_types;
+  if (topics) normalized.topics = topics;
+  else delete normalized.topics;
   for (const key of ["location_ids", "themes", "entity_ids"] as const) {
     if (normalized[key]?.length)
       normalized[key] = [...new Set(normalized[key])].sort();

@@ -6,10 +6,16 @@ export function Panel({
   title,
   children,
   viewKey,
+  allowFullscreen = false,
+  fullscreen = false,
+  onFullscreenChange,
 }: {
   title: string;
   children: ReactNode;
   viewKey: string;
+  allowFullscreen?: boolean;
+  fullscreen?: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const {
     panel,
@@ -29,6 +35,7 @@ export function Panel({
   );
   const lastTrigger = useRef<HTMLElement | null>(null);
   const open = !!panel,
+    modal = fullscreen || (mobile && sheetExpanded),
     previousOpen = useRef(false),
     touchStart = useRef<number | null>(null),
     dragged = useRef(false);
@@ -67,9 +74,10 @@ export function Panel({
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        closePanel();
+        if (fullscreen) onFullscreenChange?.(false);
+        else closePanel();
       }
-      if (e.key === "Tab" && mobile && sheetExpanded) {
+      if (e.key === "Tab" && modal) {
         const nodes = Array.from(
           root.current?.querySelectorAll<HTMLElement>(
             'button:not(:disabled),a[href],input,select,textarea,[tabindex="0"]',
@@ -94,14 +102,14 @@ export function Panel({
     };
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
-  }, [open, mobile, sheetExpanded, closePanel]);
+  }, [open, modal, fullscreen, onFullscreenChange, closePanel]);
   return (
     <aside
       ref={root}
       hidden={!open}
-      className={`content-panel ${sheetExpanded ? "is-expanded" : ""}`}
-      role={mobile && sheetExpanded ? "dialog" : "complementary"}
-      aria-modal={mobile && sheetExpanded ? true : undefined}
+      className={`content-panel ${sheetExpanded ? "is-expanded" : ""} ${fullscreen ? "is-fullscreen" : ""}`}
+      role={modal ? "dialog" : "complementary"}
+      aria-modal={modal ? true : undefined}
       aria-label={title}
     >
       <div
@@ -145,13 +153,26 @@ export function Panel({
             {title}
           </h1>
         </div>
-        <button
-          className="icon-button"
-          aria-label="Close panel"
-          onClick={closePanel}
-        >
-          <Icon name="close" />
-        </button>
+        <div className="panel-header-actions">
+          {allowFullscreen && (
+            <button
+              className="icon-button"
+              aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen news"}
+              aria-pressed={fullscreen}
+              title={fullscreen ? "Exit fullscreen" : "Fullscreen news"}
+              onClick={() => onFullscreenChange?.(!fullscreen)}
+            >
+              <Icon name={fullscreen ? "restore" : "fullscreen"} />
+            </button>
+          )}
+          <button
+            className="icon-button"
+            aria-label="Close panel"
+            onClick={closePanel}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
       </header>
       <div className="panel-body" ref={body}>
         {children}

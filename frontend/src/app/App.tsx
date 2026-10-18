@@ -86,6 +86,8 @@ export function App({
     research = useInvestigation(api, state.selectedInvestigationId),
     client = useQueryClient();
   const [layers, setLayers] = useState(false),
+    [newsFullscreen, setNewsFullscreen] = useState(false),
+    [newsFiltersOpen, setNewsFiltersOpen] = useState(false),
     [saved, setSaved] = useState(readSaved),
     [saveError, setSaveError] = useState(""),
     [prompt, setPrompt] = useState(""),
@@ -168,6 +170,10 @@ export function App({
     (key) => !["offset", "limit"].includes(key),
   ).length;
   const panelOpen = !!panel;
+  const fullscreenNews = panel?.view === "news" && newsFullscreen;
+  useEffect(() => {
+    if (panel?.view !== "news") setNewsFullscreen(false);
+  }, [panel?.view]);
   useEffect(() => {
     const update = () => {
       const width = window.innerWidth,
@@ -298,7 +304,7 @@ export function App({
     >
       <div
         className="workspace-canvas"
-        inert={!!panel && insets.bottom > 0 && state.sheetExpanded}
+        inert={fullscreenNews || (!!panel && insets.bottom > 0 && state.sheetExpanded)}
       >
         <div className="map-stage">
           <MapComponent
@@ -572,6 +578,12 @@ export function App({
       <Panel
         title={panel ? titles[panel.view] : "Workspace"}
         viewKey={panel ? panel.view + ":" + (panel.id ?? "") : "closed"}
+        allowFullscreen={panel?.view === "news"}
+        fullscreen={fullscreenNews}
+        onFullscreenChange={(next) => {
+          setNewsFullscreen(next);
+          if (next) setLayers(false);
+        }}
       >
         <div hidden={panel?.view !== "search"}>
           <FilterBar
@@ -593,6 +605,14 @@ export function App({
                 : `${displayArticles.length} articles on this page`}
             </p>
             <button
+              className="news-filter-button"
+              aria-expanded={newsFiltersOpen}
+              aria-controls="news-filter-panel"
+              onClick={() => setNewsFiltersOpen(!newsFiltersOpen)}
+            >
+              <Icon name="filter" size={16} /> Filters{filterCount ? ` (${filterCount})` : ''}
+            </button>
+            <button
               className="icon-button"
               aria-label="Saved investigations"
               onClick={() => state.openPanel({ view: "saved" })}
@@ -606,6 +626,12 @@ export function App({
             >
               <Icon name="info" />
             </button>
+          </div>
+          <div id="news-filter-panel" className="news-filter-panel" hidden={!newsFiltersOpen}>
+            {panel?.view === 'news' && newsFiltersOpen && <FilterBar api={api} filters={filters} catalog={catalog.data} onApply={next => {
+              state.applyFilters(next);
+              if (panel?.id) state.openPanel({view:'news'},true);
+            }} />}
           </div>
           {panel?.view === "news" && panel.id && (
             <p className="notice">

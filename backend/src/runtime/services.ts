@@ -17,7 +17,7 @@ export async function createServices(config: Config): Promise<Services> {
   if (databaseHandoff && config.databaseUrl) {
     const pool = await createPool(config);
     if (pool) {
-      try { repository = new PgRepository(pool,databaseHandoff); }
+      try { repository = new PgRepository(pool,databaseHandoff,contracts.newsFiltering); }
       catch (error) { await pool.end(); throw error; }
     }
   }

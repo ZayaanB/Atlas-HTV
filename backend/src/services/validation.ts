@@ -3,6 +3,12 @@ import addFormats from 'ajv-formats';
 import { AppError, unavailable } from '../runtime/errors.js';
 // Backend integration ports only. Domain schemas/types remain owned by contracts/.
 export type Data = Record<string, unknown>;
+// Optional executable handoff from the authoritative contracts module. No private
+// classification dictionary: fixtures, HTTP retrieval and Gemini use this export.
+export interface NewsFiltering {
+  categories: readonly Data[];
+  matches(article: Data, query: Data): boolean;
+}
 export function object(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AppError('INVALID_INPUT', 'Expected an object');
   return value as Data;
@@ -15,7 +21,7 @@ export const requiredSchemas = ['NewsQuery','NewsResponse','LocationsQuery','Loc
   'FocusLocationArgs','UIAction','AssistantRequest','AssistantDraft','AssistantResponse','Article','Location','Observation','Source','AircraftState','Citation'];
 export class Contracts {
   private validators = new Map<string, ValidateFunction>();
-  constructor(readonly schemas: Record<string, AnySchema> = {}) {
+  constructor(readonly schemas: Record<string, AnySchema> = {}, readonly newsFiltering?: NewsFiltering) {
     const ajv = new Ajv({ allErrors: false, strict: true, coerceTypes: false, removeAdditional: false });
     addFormats.default(ajv);
     for (const [name, schema] of Object.entries(schemas)) ajv.addSchema(schema,name);
@@ -32,11 +38,13 @@ export class Contracts {
 }
 export function normalizeQuery(raw: unknown): Data {
   const query = { ...object(raw) };
-  for (const key of ['location_ids', 'themes', 'entity_ids', 'ids']) {
+  for (const key of ['location_ids', 'themes', 'entity_ids', 'ids', 'event_types', 'topics']) {
     if (typeof query[key] === 'string') query[key] = query[key].split(',');
   }
   for (const key of ['limit', 'offset']) if (typeof query[key] === 'string' && /^\d+$/.test(query[key])) query[key] = Number(query[key]);
   if (typeof query.bounds === 'string') query.bounds = query.bounds.split(',').map(Number);
+  if (query.has_location === 'true') query.has_location = true;
+  else if (query.has_location === 'false') query.has_location = false;
   return query;
 }
 export function range(query: Data, start: string, end: string): void {

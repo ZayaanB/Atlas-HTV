@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import { AppError, checkAbort, unavailable } from '../runtime/errors.js';
-import type { Data } from '../services/validation.js';
+import type { Data, NewsFiltering } from '../services/validation.js';
+import { filterNewsPlan } from './news-filters.js';
 import { workspacePlan } from './workspace.js';
 export const reads = ['news', 'locations', 'investigation', 'observations', 'sources', 'semantic_news', 'freshness', 'embedding_chunks', 'workspace'] as const;
 export type Read = typeof reads[number];
@@ -36,14 +37,15 @@ export function validateDatabaseHandoff(value: unknown): DatabaseHandoff {
 }
 export class PgRepository implements Repository {
   readonly mode = 'stored' as const;
-  constructor(private pool: pg.Pool, private handoff: DatabaseHandoff) {
+  constructor(private pool: pg.Pool, private handoff: DatabaseHandoff, private newsFiltering?: NewsFiltering) {
     validateDatabaseHandoff(handoff);
   }
   get missingPlans() { return corePlans.filter(name => !Object.hasOwn(this.handoff.plans,name)); }
   private plan(name: keyof DatabaseHandoff['plans'], input: Data) {
     const plan = this.handoff.plans[name] ?? (name === 'workspace' ? workspacePlan : undefined);
     if (!plan) throw unavailable('SCHEMA_HANDOFF_UNAVAILABLE', `Database query ${name} awaits the frozen schema handoff`);
-    return { text: plan.text, values: plan.parameters.map(key => input[key] ?? null) };
+    const query = { text: plan.text, values: plan.parameters.map(key => input[key] ?? null) };
+    return name === 'news' || name === 'semantic_news' ? filterNewsPlan(query,input,this.newsFiltering) : query;
   }
   async read(name: Read, input: Data, signal?: AbortSignal) {
     checkAbort(signal);

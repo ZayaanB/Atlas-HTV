@@ -20,7 +20,8 @@ For the backend, use `npm --prefix frontend run dev` and start Person 3's backen
 ## Implemented experience
 
 - Centered globe/home framing, map/satellite/auto preferences, sourced markers/extents and geographic selection; one Mapbox instance.
-- Search, known-place suggestions, topics/entities/publication filters, news pagination and article metadata/provenance.
+- Search and News share event types, broad topics, stored topic tags, known places/entities, keyword, UTC publication dates, review status, linked-location availability and page-size filters. News exposes them through **Filters**; **Refine reporting** contains the additional options. Apply resets pagination; chips remove individual constraints and Clear filters resets them together. Map/feed/assistant use the same active filters.
+- News starts with compact headline rows; the chevron expands details for one article at a time. The News header's fullscreen button expands the panel; Escape restores its size before closing it.
 - One-panel Back/Close navigation, retained search drafts and scroll positions, Cmd/Ctrl+K, Escape and responsive sheet controls.
 - Investigation GET integration, known-ID access, sources/local saved IDs, paged raw timeline GET integration with units/precision/nulls, chart gaps/table alternatives, and verified dated imagery overlays.
 - Assistant POST integration with explicit action consent, validated citations, coverage/fallback diagnostics, audience emphasis, cancellation and stale-request rejection. Fixture mode never generates an AI answer.
@@ -28,6 +29,8 @@ For the backend, use `npm --prefix frontend run dev` and start Person 3's backen
 - Persistent historical/coverage labels, missing data and recoverable error states, reduced motion and keyboard affordances.
 
 Zustand owns browser state and IDs; TanStack Query owns server records. Domain schemas/types live only under `contracts/`. Public Vite inputs must never contain Gemini/database credentials.
+
+Event types and broad topics are discovery aids matched against existing tags or whole English terms in the stored headline/excerpt. They can overlap and miss stories, especially non-English or sparsely described records. They do not write classifications, change review status, infer coordinates, or add sources. OR within each group, AND across groups. Publication presets mean UTC calendar days through today's end; they exclude unknown/date-only publication times. Coverage counts describe the stored collection, not a matching-result total.
 
 ## Verify
 
