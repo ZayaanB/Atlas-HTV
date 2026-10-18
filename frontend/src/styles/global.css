@@ -336,8 +336,13 @@ details[open] > summary {
   text-shadow: 0 1px 3px #000;
   font-size: 20px;
   font-weight: 650;
-  letter-spacing: 0.28em;
+  letter-spacing: 0;
   line-height: 1;
+}
+.brand-wordmark {
+  display: block;
+  letter-spacing: 0.28em;
+  margin-inline-end: -0.28em;
 }
 .identity .audience-select { pointer-events: auto; margin: 0; gap: 3px; }
 .identity .audience-select > span { color: #d9e3ef; font-size: 11px; }

@@ -835,14 +835,6 @@ export function AtlasMap(props: AtlasMapProps) {
           {props.evidenceOverlay.evidence.imagery.attribution}
         </p>
       )}
-      {props.flightsEnabled && <p className="atlas-map__flight-attribution" style={{
-        bottom: (props.overlayInsets?.bottom ?? 0) + (props.overlayInsets?.bottom ? 42 : 100),
-        right: (props.overlayInsets?.right ?? 0) + 20,
-      }}>
-        {props.flightMode !== 'global' && props.flightCoverage && <>Coverage within this circle · {props.flightCoverage.radius_nm} nm<br /></>}
-        {props.flightMode !== 'global' && props.flightCoverageOversized && <>Zoom in for aircraft coverage<br /></>}
-        {props.flightMode === 'global' ? 'Observed positions · last 30 minutes' : 'Observed session trails'} · {props.flightAttribution}
-      </p>}
       {props.status.state === "empty" && (
         <p className="atlas-map__message" role="status">
           No mapped reporting on this page. Open Search to broaden the filters.
