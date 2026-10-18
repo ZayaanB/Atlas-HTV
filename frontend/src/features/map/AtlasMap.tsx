@@ -12,6 +12,7 @@ import { updateEvidence } from "./EvidenceLayer";
 import { updateFlights, FLIGHT_LAYERS } from "./FlightLayer";
 import { GLOBE_CENTER, homeZoom, homePadding } from "./style";
 import { compactMapLabel, installStoryGlow, startStoryPulse, STORY_GLOW_ID } from "./news-points";
+import { IDLE_SPIN_EVENT, startIdleGlobeSpin } from './idle-spin';
 
 const TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim();
 const EXTENT_SOURCE_ID = "atlas-extent-data";
@@ -480,7 +481,8 @@ export function AtlasMap(props: AtlasMapProps) {
       styleReadyRef.current = false;
       map.setStyle(styleUrl(nextStyle));
     };
-    const moveEnd = () => {
+    const moveEnd = (event: mapboxgl.MapEvent) => {
+      if (IDLE_SPIN_EVENT in event) return;
       programmaticMotionRef.current = false;
       synchronizeStyle();
       publishViewport();
@@ -590,6 +592,12 @@ export function AtlasMap(props: AtlasMapProps) {
     map.on("click", click);
     map.on("error", mapErrorHandler);
     const stopStoryPulse = startStoryPulse(map, () => styleReadyRef.current);
+    const stopIdleSpin = startIdleGlobeSpin(map, () => {
+      const current = propsRef.current;
+      const inspecting = current.selection.articleId || current.selection.locationId || current.selectedAircraftId || current.evidenceOverlay;
+      return styleReadyRef.current && !programmaticMotionRef.current && !current.cameraCommand &&
+        !containerRef.current?.closest('[inert]') && (!inspecting || homeRef.current);
+    }, publishViewport);
     const canvasContainer = map.getCanvasContainer();
     canvasContainer.addEventListener("pointerdown", stopProgrammaticMotion, {
       passive: true,
@@ -600,6 +608,7 @@ export function AtlasMap(props: AtlasMapProps) {
     canvasContainer.addEventListener("keydown", stopProgrammaticMotion);
 
     return () => {
+      stopIdleSpin();
       stopStoryPulse();
       canvasContainer.removeEventListener(
         "pointerdown",

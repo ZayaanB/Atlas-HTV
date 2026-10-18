@@ -321,13 +321,22 @@ details[open] > summary {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 14px;
+  gap: 10px;
   pointer-events: none;
 }
 .brand {
-  font-size: 18px;
-  font-weight: 450;
-  letter-spacing: 0.32em;
+  display: inline-block;
+  padding: 12px 14px;
+  border: 1px solid #ffffff30;
+  border-radius: 12px;
+  background: #080d15eb;
+  color: #ffffff;
+  box-shadow: 0 4px 22px #00000050;
+  backdrop-filter: blur(14px);
+  text-shadow: 0 1px 3px #000;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: 0.28em;
   line-height: 1;
 }
 .coverage-badge {
@@ -1162,7 +1171,8 @@ th {
     padding: 10px 14px;
   }
   .brand {
-    font-size: 16px;
+    font-size: 18px;
+    padding: 11px 12px;
   }
 }
 @media (max-width: 420px) {
