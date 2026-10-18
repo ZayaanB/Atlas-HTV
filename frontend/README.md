@@ -20,6 +20,7 @@ For the backend, use `npm --prefix frontend run dev` and start Person 3's backen
 ## Implemented experience
 
 - Centered globe/home framing, map/satellite/auto preferences, sourced markers/extents and geographic selection; one Mapbox instance.
+- A high-contrast ATLAS title remains readable over map labels and imagery. After three seconds without input, the globe rotates slowly below zoom 3 (slowing above zoom 2). Pointer, wheel and keyboard input pause it; local views, inspected locations, evidence, modal panels, typing, hidden tabs and reduced-motion settings keep it still. A visible browser can rotate while focus is in the adjacent chat. Return to globe permits idle rotation again. Decorative camera frames do not trigger news retrieval or report user navigation.
 - Search and News share event types, broad topics, stored topic tags, known places/entities, keyword, UTC publication dates, review status, linked-location availability and page-size filters. News exposes them through **Filters**; **Refine reporting** contains the additional options. Apply resets pagination; chips remove individual constraints and Clear filters resets them together. Map/feed/assistant use the same active filters.
 - News starts with compact headline rows; the chevron expands details for one article at a time. The News header's fullscreen button expands the panel; Escape restores its size before closing it.
 - One-panel Back/Close navigation, retained search drafts and scroll positions, Cmd/Ctrl+K, Escape and responsive sheet controls.
