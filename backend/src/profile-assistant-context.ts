@@ -63,4 +63,4 @@ for (const history of [[], Array.from({ length: 6 }, (_, index) => [
     validated_citations: records(result.citations).length });
 }
 console.log(JSON.stringify({ profile: 'offline_historical_fixture', live_provider_or_database_calls: false,
-  working_ceiling_bytes: 48000, hard_guard_bytes: config.aiMaxContextBytes, scenarios: report }, null, 2));
+  working_ceiling_bytes: config.aiMaxContextBytes, hard_guard_bytes: config.aiMaxContextBytes, scenarios: report }, null, 2));

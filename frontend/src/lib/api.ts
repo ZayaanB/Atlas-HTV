@@ -1,5 +1,6 @@
 import type {
   WorkspaceResponse,
+  Article,
   InvestigationResponse,
   ObservationsQuery,
   CompareObservationsArgs,
@@ -7,6 +8,9 @@ import type {
   AssistantRequestV2,
   AssistantResponseV2,
   AssistantStreamEvent,
+  AssistantRequestV3,
+  AssistantResponseV3,
+  AssistantStreamEventV3,
   FlightsResponse,
   WindQuery,
   WindResponse,
@@ -28,6 +32,7 @@ export type DataMode = "api" | "fixture";
 export interface AtlasApi {
   readonly mode: DataMode;
   workspace?: (signal: AbortSignal) => Promise<WorkspaceResponse>;
+  article?: (id: string, signal: AbortSignal) => Promise<Article>;
   investigation?: (
     id: string,
     signal: AbortSignal,
@@ -49,6 +54,8 @@ export interface AtlasApi {
     signal: AbortSignal,
     onEvent: (event: AssistantStreamEvent) => void,
   ) => Promise<AssistantResponseV2>;
+  assistantV3?: (request: AssistantRequestV3, signal: AbortSignal) => Promise<AssistantResponseV3>;
+  assistantStreamV3?: (request: AssistantRequestV3, signal: AbortSignal, onEvent: (event: AssistantStreamEventV3) => void) => Promise<AssistantResponseV3>;
   flights?: (regionId: string, signal: AbortSignal) => Promise<FlightsResponse>;
   wind?: (query: WindQuery, signal: AbortSignal) => Promise<WindResponse>;
   flightArea?: (query: FlightAreaQuery, signal: AbortSignal) => Promise<FlightAreaResponse>;
@@ -148,6 +155,7 @@ export function serializeQuery(query: NewsQuery | LocationsQuery | FlightAreaQue
 }
 export function createHttpApi(
   fetcher: typeof fetch = globalThis.fetch,
+  assistantVersion: 2 | 3 = 3,
 ): AtlasApi {
   async function get(
     path: string,
@@ -299,6 +307,7 @@ export function createHttpApi(
   }
   return {
     workspace: (signal) => feature("WorkspaceResponse", "workspace", signal),
+    article: (id, signal) => feature('Article', `articles/${encodeURIComponent(readContract('InvestigationQuery', { id }).id)}`, signal),
     investigation: (id, signal) =>
       feature(
         "InvestigationResponse",
@@ -324,6 +333,33 @@ export function createHttpApi(
         signal,
         readContract("AssistantRequestV2", request),
       ),
+    ...(assistantVersion === 3 ? { assistantV3: (request, signal) => feature('AssistantResponseV3', 'assistant', signal, readContract('AssistantRequestV3', request)),
+    assistantStreamV3: async (request, signal, onEvent) => {
+      readContract('AssistantRequestV3', request);
+      let response: Response;
+      try {
+        response = await fetcher('/api/assistant', { method: 'POST', signal,
+          headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
+      } catch (error) {
+        if (signal.aborted) throw error;
+        throw new ApiFailure('Cannot reach the Atlas API. Check the backend connection.', 'NETWORK_ERROR', 0, true, request.request_id);
+      }
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
+        const body: unknown = await response.json().catch(() => null);
+        if (!response.ok) {
+          try {
+            const { error } = readContract('ApiError', body);
+            throw new ApiFailure(error.message, error.code, response.status, error.retryable, error.request_id);
+          } catch (error) {
+            if (error instanceof ApiFailure) throw error;
+            throw new ApiFailure(`Assistant unavailable (${response.status}).`, 'HTTP_ERROR', response.status, response.status >= 500 || response.status === 429, request.request_id);
+          }
+        }
+        try { return readContract('AssistantResponseV3', body); }
+        catch { throw new ApiFailure('The response failed shared validation.', 'INVALID_RESPONSE', 502, false, request.request_id); }
+      }
+      return readAssistantStream(response, request.request_id, signal, onEvent, 3);
+    } } satisfies Partial<AtlasApi> : {}),
     assistantStream: async (request, signal, onEvent) => {
       readContract("AssistantRequestV2", request);
       let response: Response;
@@ -378,20 +414,22 @@ export function createHttpApi(
   };
 }
 
-async function readAssistantStream(response: Response, requestId: string, signal: AbortSignal, onEvent: (event: AssistantStreamEvent) => void): Promise<AssistantResponseV2> {
+function readAssistantStream(response: Response, requestId: string, signal: AbortSignal, onEvent: (event: AssistantStreamEvent) => void): Promise<AssistantResponseV2>;
+function readAssistantStream(response: Response, requestId: string, signal: AbortSignal, onEvent: (event: AssistantStreamEventV3) => void, version: 3): Promise<AssistantResponseV3>;
+async function readAssistantStream(response: Response, requestId: string, signal: AbortSignal, onEvent: ((event: AssistantStreamEvent) => void) | ((event: AssistantStreamEventV3) => void), version: 2 | 3 = 2): Promise<AssistantResponseV2 | AssistantResponseV3> {
   const interrupted = () => new ApiFailure('The answer was interrupted. Retry the question to get a complete, checked response.', 'STREAM_INTERRUPTED', 502, true, requestId);
   const invalid = () => new ApiFailure('The assistant stream failed shared validation.', 'INVALID_RESPONSE', 502, false, requestId);
   if (!response.body) throw interrupted();
   const reader = response.body.getReader(), decoder = new TextDecoder('utf-8', { fatal: true });
-  let buffer = '', received = 0, previewLength = 0, final: AssistantResponseV2 | undefined;
+  let buffer = '', received = 0, previewLength = 0, final: AssistantResponseV2 | AssistantResponseV3 | undefined;
   const abort = () => { void reader.cancel().catch(() => {}); };
   signal.addEventListener('abort', abort, { once: true });
   function frame(value: string) {
     const lines = value.split('\n').filter(line => line.startsWith('data:'));
     if (!lines.length) return;
     if (final) throw invalid();
-    let event: AssistantStreamEvent;
-    try { event = readContract('AssistantStreamEvent', JSON.parse(lines.map(line => line.slice(5).trimStart()).join('\n'))); }
+    let event: AssistantStreamEvent | AssistantStreamEventV3;
+    try { event = readContract(version === 3 ? 'AssistantStreamEventV3' : 'AssistantStreamEvent', JSON.parse(lines.map(line => line.slice(5).trimStart()).join('\n'))); }
     catch { throw invalid(); }
     if (event.request_id !== requestId) throw invalid();
     if (event.type === 'error') {
@@ -403,7 +441,8 @@ async function readAssistantStream(response: Response, requestId: string, signal
       final = event.response;
     } else {
       if (event.type === 'answer_delta' && (previewLength += event.text.length) > 32000) throw invalid();
-      onEvent(event);
+      if (version === 3) (onEvent as (event: AssistantStreamEventV3) => void)(event as AssistantStreamEventV3);
+      else (onEvent as (event: AssistantStreamEvent) => void)(event as AssistantStreamEvent);
     }
   }
   try {

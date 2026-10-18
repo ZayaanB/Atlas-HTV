@@ -167,7 +167,7 @@ test("actual respond tool resolves model-only citations using shared schemas and
   assert.equal(response.request_id, "request-1");
 });
 
-test("a full investigation exceeding the default context budget falls back without model calls or actions", async () => {
+test("a full investigation exceeding its configured context budget falls back without model calls or actions", async () => {
   let calls = 0;
   const model = {
     async generate() {
@@ -176,7 +176,7 @@ test("a full investigation exceeding the default context budget falls back witho
     },
   };
   const assistant = new Assistant(
-    readConfig({}),
+    readConfig({ AI_MAX_CONTEXT_BYTES: '4000' }),
     contracts,
     researchRetrieval(),
     undefined,

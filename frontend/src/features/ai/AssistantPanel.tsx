@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { AssistantResponseV2, CitationV2 } from "@atlas/contracts";
+import type { AssistantResponseV2, AssistantResponseV3, CitationV2 } from "@atlas/contracts";
 import type { AssistantSession } from "./session";
 import { useWorkspace } from "../../app/state";
 import { audienceProfiles } from "../../app/audience";
@@ -17,7 +17,7 @@ const phases = {
   validating: 'Finishing your response…',
 } as const;
 
-function Answer({ response }: { response: AssistantResponseV2 }) {
+function Answer({ response }: { response: AssistantResponseV2 | AssistantResponseV3 }) {
   const parts = response.answer.split(/(\[\d+\])/g);
   return (
     <p className="answer-text">
@@ -132,8 +132,13 @@ export function AssistantPanel({
     filterUndo,
     undoFilters,
     openPanel,
+    contextRevision,
+    workspaceUndo,
+    undoWorkspace,
   } = useWorkspace();
   const pendingTurn = session.exchanges.find(turn => turn.status === 'pending');
+  const latestResponse = session.exchanges.filter(turn => turn.status === 'complete' && turn.response?.mode !== 'fallback').at(-1)?.response;
+  const latestPendingId = latestResponse?.protocol_version === 3 ? latestResponse.pending?.id : null;
   const conversation = useRef<HTMLDivElement>(null), follow = useRef(true), input = useRef<HTMLTextAreaElement>(null), footer = useRef<HTMLDivElement>(null);
   const [showLatest, setShowLatest] = useState(false);
   useEffect(() => {
@@ -184,8 +189,7 @@ export function AssistantPanel({
       </div>
       <p className="assistant-context muted">
         <Icon name="layers" size={13} />
-        {selection.locationId ? "Selected place" : selectedInvestigationId ? "Selected investigation" : selection.articleId ? "Selected article" : "Current reporting"}
-        <span>· active filters</span>
+        {session.useV3 ? session.contextLabel : <>{selection.locationId ? "Selected place" : selectedInvestigationId ? "Selected investigation" : selection.articleId ? "Selected article" : "Current reporting"}<span>· active filters</span></>}
       </p>
       {fixture && (
         <p className="notice">
@@ -244,7 +248,7 @@ export function AssistantPanel({
                 </p>
                 {turn.error.code === "CONTRACTS_UNAVAILABLE" ? (
                   <p>
-                    The backend needs the v2 contracts build and a restart.
+                    The backend needs the {session.useV3 ? 'v3' : 'v2'} contracts build and a restart.
                     Manual search is available.
                   </p>
                 ) : (
@@ -266,7 +270,37 @@ export function AssistantPanel({
             {turn.response && (
               <article className="message assistant">
                 <span className="meta">Atlas{turn.response.mode !== "live" && ` · ${turn.response.mode}`}</span>
+                {turn.response.protocol_version === 3 && (turn.contextMoved || turn.acceptedRevision !== contextRevision) && (
+                  <p className="meta">Answer for {turn.contextLabel ?? 'the view when you asked'}</p>
+                )}
                 <Answer response={turn.response} />
+                {turn.response.protocol_version === 3 && turn.response.references.length > 0 && (
+                  <ol className="plain-list" aria-label="Discussed records">
+                    {turn.response.references.map(reference => (
+                      <li key={`${reference.record_type}:${reference.id}`}>
+                        <button className="text-button" disabled={session.pending} onClick={() => void session.applyActions(
+                          reference.record_type === 'location' ? [{ type: 'focus_location', location_id: reference.id }]
+                            : [{ type: 'open_record', record_type: reference.record_type, id: reference.id }],
+                        )}>Open {reference.label}</button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {turn.response.protocol_version === 3 && turn.response.pending && (
+                  <div className="assistant-choices" aria-label="Clarification choices">
+                    {turn.response.pending.choices.map(choice => <button className="text-button" key={choice} disabled={session.pending || latestPendingId !== (turn.response?.protocol_version === 3 ? turn.response.pending?.id : null)}
+                      onClick={() => void session.reply(choice)}>{choice}</button>)}
+                    {turn.response.pending.actions.length > 0 && <>
+                      <button className="text-button" disabled={session.pending || latestPendingId !== turn.response.pending.id} onClick={() => void session.reply('Yes')}>Apply proposed change</button>
+                      <button className="text-button" disabled={session.pending || latestPendingId !== turn.response.pending.id} onClick={() => void session.reply('No')}>Keep this view</button>
+                    </>}
+                  </div>
+                )}
+                {turn.actionsState === 'applied' && <p className="meta">Workspace updated.</p>}
+                {turn.actionsState === 'stale' && <p className="notice">You moved to a different view. The proposed workspace changes were held.</p>}
+                {turn.actionError && <p className="notice">{turn.actionError} Your answer is still available.</p>}
+                {(turn.actionsState === 'stale' || turn.actionsState === 'failed') && <button className="text-button" disabled={session.pending}
+                  onClick={() => void session.applyActions(turn.response!.actions, turn.response!.resolved_range, turn.id)}>Apply these workspace changes</button>}
                 <details className="assistant-response-details">
                   <summary>Response details</summary>
                   <p className="meta">
@@ -351,7 +385,8 @@ export function AssistantPanel({
         <p role="status" aria-atomic="true" className={pendingTurn || !session.status ? 'sr-only' : 'assistant-status'}>
           {pendingTurn ? phases[pendingTurn.phase ?? 'reading'] : session.status}
         </p>
-        {filterUndo && (
+        {workspaceUndo && session.useV3 && <button className="text-button" onClick={undoWorkspace}>Undo workspace change</button>}
+        {filterUndo && (!workspaceUndo || !session.useV3) && (
           <button className="text-button" onClick={undoFilters}>
             Undo filters
           </button>

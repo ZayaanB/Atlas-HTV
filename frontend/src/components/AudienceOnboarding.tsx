@@ -7,7 +7,7 @@ export function AudienceOnboarding() {
   const id = useId(), heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
-    return () => document.querySelector<HTMLSelectElement>('.identity .audience-select select')?.focus();
+    return () => document.querySelector<HTMLButtonElement>('button[aria-label="Open search"]')?.focus();
   },[]);
   return <div className="audience-onboarding" role="dialog" aria-modal="true" aria-labelledby={`${id}-heading`} aria-describedby={`${id}-description`}
     onKeyDown={event => {

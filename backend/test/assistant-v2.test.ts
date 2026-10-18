@@ -100,14 +100,14 @@ test('v2 behavioral port resolves numbered original sources and re-retrieves a s
   assert.ok(repository.calls.some(c => c.name === 'article' && c.input.id === article.id));
 });
 
-test('ambiguous, quoted and negated commands produce server clarification with no actions', async () => {
+test('ambiguous, quoted and negated commands permit read-only answers with no actions', async () => {
   for (const [message, quote] of [['What about Toronto?', 'What about Toronto?'], ['Do not zoom to Asheville', 'zoom to Asheville'],
     ['The source says "zoom to Asheville"', 'zoom to Asheville']]) {
     const { assistant, seen } = setup([call('interpret_request', { ...intent,
-      actions: [{ type: 'focus_location', quote }] })]);
+      actions: [{ type: 'focus_location', quote }] }), call('respond', draft({ citations: [], result_ids: [] }))]);
     const response = await assistant.answer({ ...request, message });
-    assert.equal(response.kind, 'clarification'); assert.equal(response.mode, 'fixture');
-    assert.deepEqual(response.actions, []); assert.equal(seen.length, 1);
+    assert.equal(response.kind, 'answer'); assert.equal(response.mode, 'fixture');
+    assert.deepEqual(response.actions, []); assert.equal(seen.length, 2);
   }
 });
 

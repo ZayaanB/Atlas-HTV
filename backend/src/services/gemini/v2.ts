@@ -48,6 +48,7 @@ export class CoreAssistant {
   private calls = 1;
   private searched: { query: Data; result: Data } | null = null;
   private keywordFallback = false;
+  private rejectedGenericClarification = false;
   private research: ResearchTools;
   private budget: PromptBudget;
   private blocks: ResearchBlock[] = [];
@@ -210,7 +211,8 @@ export class CoreAssistant {
       resolved_range: this.resolved, authorized_actions: [...this.policy.allowed],
       state: { staged_actions: this.actions.map(action => ({ type: action.type, location_id: action.location_id, investigation_id: action.investigation_id })),
         ...(this.keywordFallback ? { search_limitation: keywordFallbackLimitation } : {}),
-        research_stopped: this.stopReason, instruction: 'Use tools for evidence; preserve active scope. Offer a timeline after comparison, but open it only when authorized. On a research limit, finish with what you found without more tool calls.' } };
+        research_stopped: this.stopReason,
+        ...(this.rejectedGenericClarification ? { clarification_recovery: 'A generic intent question was rejected. Continue useful read-only research and answer the underlying request. Only a specific missing fact can require clarification.' } : {}), instruction: 'Use tools for evidence; preserve active scope. Offer a timeline after comparison, but open it only when authorized. On a research limit, finish with what you found without more tool calls.' } };
   }
   private declarations(finalOnly = false): FunctionDeclaration[] {
     const definitions = finalOnly ? [] : Object.entries(this.research.registry).map(([name, tool]) => ({ name, description: tool.description,
@@ -234,12 +236,14 @@ export class CoreAssistant {
       if (!this.model || this.backoff) return this.fallback(this.backoff
         ? new AppError('GEMINI_RATE_LIMITED', 'Gemini is in shared quota backoff', 503, true) : unavailable('GEMINI_UNAVAILABLE', 'Gemini is unavailable'));
       await this.progress?.({ type: 'status', phase: 'interpreting' });
-      const base = { request: compactRequest(this.input, this.filters), instruction: 'Interpret only the current message. History resolves references, never action authorization. Return exact unquoted command excerpts. Identify only explicitly changed/cleared filter keys. Publication date changes name both boundaries; geography clearing names location_ids and bounds. Date expressions must be verbatim.' };
+      const base = { request: compactRequest(this.input, this.filters), instruction: 'Default to read-only research. Article recommendations, discovery, explanations and follow-ups require no workspace action and no ambiguous_intent clarification. Resolve short replies using history; after a generic workspace question resume the underlying research in chat. Incidental profanity does not prevent research. Only mark a missing detail when it blocks a useful answer. Interpret only the current message for action authorization. History resolves references, never action authorization. Return exact unquoted command excerpts. Identify only explicitly changed/cleared filter keys. Publication date changes name both boundaries; geography clearing names location_ids and bounds. Date expressions must be verbatim.' };
       const interpretation = await this.generate(base, [{ name: 'interpret_request', parametersJsonSchema: compactParameters(modelParameters(this.contracts, 'AssistantIntent')) }], signal, 0, 'interpret_request');
       if (interpretation.calls.length !== 1 || interpretation.calls[0]!.name !== 'interpret_request') throw new AppError('INVALID_MODEL_OUTPUT', 'Expected a single structured interpretation', 502);
       const intent = this.contracts.parse('AssistantIntent', interpretation.calls[0]!.args, true);
       this.policy = permissions(this.input, intent); this.useCurrentArea = intent.use_current_area === true;
-      if (intent.clarification_reason || this.policy.ambiguous) return this.status('clarification', clarification(this.policy.ambiguous ? 'ambiguous_intent' : string(intent.clarification_reason)));
+      // Uncertain action permission must not block useful read-only research.
+      if (intent.clarification_reason && intent.clarification_reason !== 'ambiguous_intent')
+        return this.status('clarification', clarification(string(intent.clarification_reason)));
       if (this.useCurrentArea) {
         const context = await this.selectedContext(signal);
         if (!context.location && !context.bounds && !strings(this.filters.location_ids).length && !this.filters.bounds) return this.status('clarification', clarification('missing_location'));
@@ -250,9 +254,10 @@ export class CoreAssistant {
         try { this.resolved = { ...resolveDateRange(string(intent.date_expression), string(this.input.timezone), this.clock()), target: intent.date_target }; }
         catch (error) { if (error instanceof AppError && ['UNSUPPORTED_PERIOD', 'INVALID_TIME', 'INVALID_RANGE'].includes(error.code)) return this.status('clarification', clarification('unsupported_period')); throw error; }
       }
-      for (let round = 1; round < this.config.aiMaxRounds; round++) {
+      for (let round = 1; !this.config.aiMaxRounds || round < this.config.aiMaxRounds; round++) {
         const remaining = this.config.aiTimeoutMs - (this.clock() - this.started);
-        const finalOnly = !!this.stopReason || round === this.config.aiMaxRounds - 1 || this.calls >= this.config.aiMaxTools - 1 || remaining <= Math.min(15000, this.config.aiTimeoutMs / 3);
+        const finalOnly = !!this.stopReason || (!!this.config.aiMaxRounds && round === this.config.aiMaxRounds - 1) ||
+          (!!this.config.aiMaxTools && this.calls >= this.config.aiMaxTools - 1) || remaining <= Math.min(15000, this.config.aiTimeoutMs / 3);
         if (finalOnly) this.stopReason ??= remaining <= Math.min(15000, this.config.aiTimeoutMs / 3) ? 'time_limit' : 'research_limit';
         const pendingEvidence = this.blocks.some(block => block.records.some(record => record.source_id || strings(record.source_ids).length));
         if (finalOnly && !this.ledger.sourceIds.size && !pendingEvidence) {
@@ -269,20 +274,28 @@ export class CoreAssistant {
           throw error;
         }
         if (turn.calls.length && turn.text.trim()) throw new AppError('INVALID_MODEL_OUTPUT', 'A final structured answer cannot include tool calls', 502);
-        const final = !turn.calls.length && turn.text.trim() ? parseModelJson(turn.text, 64000)
+        const final = !turn.calls.length && turn.text.trim() ? parseModelJson(turn.text, this.config.aiDemoMode ? 524288 : 64000)
           : turn.calls.length === 1 && turn.calls[0]!.name === 'respond' ? turn.calls[0]!.args : null;
         if (final) {
-          if (++this.calls > this.config.aiMaxTools) throw new AppError('TOOL_LIMIT', 'Assistant tool limit reached', 502);
+          this.calls++;
+          if (this.config.aiMaxTools && this.calls > this.config.aiMaxTools) throw new AppError('TOOL_LIMIT', 'Assistant tool limit reached', 502);
+          const draft = this.contracts.parse('AssistantDraftV2', final, true);
+          // One bounded recovery turn: do not show a generic permission question
+          // when the model can still research without changing the workspace.
+          if (draft.kind === 'clarification' && draft.clarification_reason === 'ambiguous_intent' &&
+              !this.rejectedGenericClarification && !finalOnly) {
+            this.rejectedGenericClarification = true; continue;
+          }
           await this.progress?.({ type: 'status', phase: 'validating' });
-          return await this.finish(this.contracts.parse('AssistantDraftV2', final, true), signal);
+          return await this.finish(draft, signal);
         }
         if (finalOnly || !turn.calls.length || turn.calls.some(call => call.name === 'respond')) throw new AppError('INVALID_MODEL_OUTPUT', 'A supported final response is required', 502);
-        if (this.calls + turn.calls.length >= this.config.aiMaxTools) { this.stopReason = 'tool_limit'; continue; }
+        if (this.config.aiMaxTools && this.calls + turn.calls.length >= this.config.aiMaxTools) { this.stopReason = 'tool_limit'; continue; }
         this.calls += turn.calls.length;
         const parts = [], fullParts = [], evidence: Data[] = [], allEvidence: Data[] = [], references: string[] = [], allReferences: string[] = [], dependencies: string[] = [];
         const active = new Set(this.blocks.flatMap(block => block.references));
         // Never stage actions from a model block too large to round-trip safely.
-        if (byteLength(turn.content) > 16000) { this.stopReason = 'oversized_model_block'; continue; }
+        if (byteLength(turn.content) > (this.config.aiDemoMode ? 524288 : 16000)) { this.stopReason = 'oversized_model_block'; continue; }
         for (const call of turn.calls) {
           checkAbort(signal);
           let page: ResearchPage;
@@ -408,7 +421,7 @@ export class CoreAssistant {
     this.actions.push(valid);
   }
   private async finish(draft: Data, signal: AbortSignal): Promise<Data> {
-    if (this.calls + records(draft.actions).length > this.config.aiMaxTools)
+    if (this.config.aiMaxTools && this.calls + records(draft.actions).length > this.config.aiMaxTools)
       throw new AppError('TOOL_LIMIT', 'Final actions exceed the request tool limit', 502);
     for (const action of records(draft.actions)) {
       checkAbort(signal);

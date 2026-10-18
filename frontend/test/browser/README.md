@@ -1,4 +1,14 @@
-# Local global-flight browser verification
+# Local browser verification
+
+## Context-aware assistant v3
+
+Run `npm --prefix frontend run dev -- --port 5192 --strictPort` and open `http://127.0.0.1:5192/test/browser/assistant-v3.html`. This entry uses the real App/session/actions with historical records, a labeled injected answer and a map placeholder. It loads no map tiles and calls no Gemini/database/provider. It is never imported by the production entry.
+
+At desktop and 390×844: send a question to inspect long record labels, result opening, response details and workspace Undo. Ask about Toronto to inspect clarification choices. While an answer is pending, select “Move to another view” (desktop) or close/reopen the panel to inspect the original-context label and held action. Generation is delayed 1.2 seconds for these checks. The synthetic action is always a basemap change; this harness does not evaluate intent understanding. Stop the temporary Vite process after review.
+
+Native Chrome review confirmed wrapped record links, context labels, actions/Undo and the responsive assistant at desktop and 390×844. Browser extensions and the map placeholder are excluded from product layout assessment. No real-provider or physical-device result is implied.
+
+## Global flights
 
 This test-only entry renders the real App and AtlasMap. A Mapbox subclass replaces styles with a local empty style, uses local fonts, disables performance metrics, and redirects its API base to localhost. Browser automation blocks every external request, including telemetry. The injected fetch returns synthetic global responses through `createHttpApi`, so the production response validator still runs. News/research are explicitly labeled historical fixtures. It is never imported by the production entry and does not use real credentials, providers or a database.
 

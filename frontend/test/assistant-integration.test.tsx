@@ -21,10 +21,12 @@ import type {
 import { AssistantPanel } from "../src/features/ai/AssistantPanel";
 import { useAssistantSession } from "../src/features/ai/session";
 import { useWorkspace } from "../src/app/state";
-import { ApiFailure, createHttpApi, type AtlasApi } from "../src/lib/api";
+import { ApiFailure, createHttpApi as createHttpApiCurrent, type AtlasApi } from "../src/lib/api";
 import { createFixtureApi } from "../src/lib/fixture-api";
 import { createQueryClient } from "../src/lib/queries";
 import { readContract } from "../src/lib/validation";
+// Keep the existing v2 protocol regression suite explicit; v3 has its own integration scenarios.
+const createHttpApi: typeof createHttpApiCurrent = fetcher => createHttpApiCurrent(fetcher, 2);
 const investigation = readContract(
   "InvestigationResponse",
   research.investigations[0],
@@ -84,7 +86,7 @@ function streamingApi() {
     return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
   });
   return {
-    api: createHttpApi(fetcher), fetcher,
+    api: createHttpApi(fetcher, 2), fetcher,
     get request() { return request; },
     event(value: Record<string, unknown>) { controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ request_id: request.request_id, ...value })}\n\n`)); },
     close() { controller.close(); },
@@ -109,7 +111,7 @@ function Harness({
   );
 }
 function mount(
-  api = createFixtureApi(),
+  api = createFixtureApi(2),
   data?: InvestigationResponse,
   articles?: Article[],
 ) {
@@ -247,7 +249,7 @@ it.each([
 it("applies one atomic filter/focus transaction, keeps its answer, updates here, and supports filter-only Undo", async () => {
   const requests: AssistantRequestV2[] = [];
   const api = {
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (request: AssistantRequestV2) => {
       requests.push(request);
       return response(request.request_id, {
@@ -285,7 +287,7 @@ it("invalidates Undo on later manual filters and clears only incompatible select
   useWorkspace.getState().selectInvestigation(investigation.investigation.id);
   mount(
     {
-      ...createFixtureApi(),
+      ...createFixtureApi(2),
       assistant: async (r) =>
         response(r.request_id, {
           actions: [
@@ -308,7 +310,7 @@ it("invalidates Undo on later manual filters and clears only incompatible select
 });
 it("an unavailable second target prevents the entire batch from applying", async () => {
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) =>
       response(r.request_id, {
         actions: [
@@ -336,7 +338,7 @@ it.each([
       signal!: AbortSignal,
       id = "";
     mount({
-      ...createFixtureApi(),
+      ...createFixtureApi(2),
       assistant: (r, s) => {
         id = r.request_id;
         signal = s;
@@ -379,7 +381,7 @@ it.each([
 it("cancels during target resolution and never applies late targets", async () => {
   let resolve!: (r: LocationsResponse) => void, signal!: AbortSignal;
   const api: AtlasApi = {
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     locations: (_q, s) => {
       signal = s;
       return new Promise((done) => {
@@ -411,7 +413,7 @@ it("cancels during target resolution and never applies late targets", async () =
 it("retries the same failed user turn with a fresh request ID and preserves structured failure information", async () => {
   const requests: AssistantRequestV2[] = [];
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) => {
       requests.push(r);
       if (requests.length === 1)
@@ -447,7 +449,7 @@ it("missing v2 contracts show setup/manual search without a catalog request or d
       503,
     ),
   );
-  mount(createHttpApi(fetcher));
+  mount(createHttpApi(fetcher, 2));
   await send();
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "v2 contracts build and a restart",
@@ -465,7 +467,7 @@ it("renders escaped plain text, original citation links, date-only metadata, and
     title: `Source ${i + 1}`,
   }));
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) =>
       response(r.request_id, {
         answer: "<img src=x onerror=alert(1)> [1] [2] [3] [4] [5]",
@@ -489,7 +491,7 @@ it("renders escaped plain text, original citation links, date-only metadata, and
 it("clarification and empty/status responses use server text/counts and only actions change filters", async () => {
   let count = 0;
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) =>
       response(r.request_id, {
         kind: ++count === 1 ? "clarification" : "empty",
@@ -526,7 +528,7 @@ it("keeps comparison suggestions in chat and validates timeline links without a 
     observed_to: "2024-09-28T03:59:59.999Z",
   };
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) => response(r.request_id, { timeline: target }),
   });
   const user = await send();
@@ -566,7 +568,7 @@ it("validates outgoing requests before fetch and preserves HTTP code, retryabili
       429,
     ),
   );
-  const api = createHttpApi(fetcher),
+  const api = createHttpApi(fetcher, 2),
     request = {
       protocol_version: 2 as const,
       request_id: "client-id",
@@ -600,7 +602,7 @@ it("focus clears selections unsupported by stored place relationships while pres
   useWorkspace.getState().selectAircraft("air-independent");
   mount(
     {
-      ...createFixtureApi(),
+      ...createFixtureApi(2),
       locations: async () => ({
         items: [other],
         coverage: { mode: "fixture", live: false },
@@ -623,7 +625,7 @@ it("focus clears selections unsupported by stored place relationships while pres
 });
 it("an unlinked timeline series rejects the preceding valid filter action", async () => {
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) =>
       response(r.request_id, {
         actions: [
@@ -644,7 +646,7 @@ it("an unlinked timeline series rejects the preceding valid filter action", asyn
 it("retries a retryable fallback without duplicating its user message or sending fallback history", async () => {
   const requests: AssistantRequestV2[] = [];
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) => {
       requests.push(r);
       return requests.length === 1
@@ -783,7 +785,7 @@ it('replaces rejected provisional text with the labeled fallback and permits man
 
 it('ignores late streaming callbacks and completion after cancellation, including adapters that ignore abort', async () => {
   let publish!: (event: AssistantStreamEvent) => void, finish!: (value: AssistantResponseV2) => void, requestId = '';
-  mount({ ...createFixtureApi(), assistantStream: async (request, _signal, update) => {
+  mount({ ...createFixtureApi(2), assistantStream: async (request, _signal, update) => {
     publish = update; requestId = request.request_id;
     return new Promise(resolve => { finish = resolve; });
   } });
@@ -816,7 +818,7 @@ it('decodes SSE across byte, CRLF, escaped text and Unicode boundaries without w
 });
 
 it('accepts headings without treating them as unsupported factual paragraphs', async () => {
-  mount({ ...createFixtureApi(), assistant: async request => response(request.request_id, {
+  mount({ ...createFixtureApi(2), assistant: async request => response(request.request_id, {
     answer: '## Historical evidence\n\nSynthetic sourced explanation [1].\n\nEvidence limits:\n\nA documented limitation [1].',
   }) });
   await send(); await screen.findAllByRole('link', { name: /Source 1/ });
@@ -846,7 +848,7 @@ it('follows streaming while at the bottom and preserves the reading position aft
 
 it('sends with Enter, keeps Shift+Enter for new lines, and focuses suggested questions in the pinned composer', async () => {
   const assistant = vi.fn(async (request: AssistantRequestV2) => response(request.request_id));
-  mount({ ...createFixtureApi(), assistant });
+  mount({ ...createFixtureApi(2), assistant });
   const user = userEvent.setup(), input = screen.getByLabelText('Your question');
   await user.click(screen.getByText('Suggested questions'));
   await user.click(screen.getByRole('button', { name: /What local events/ }));

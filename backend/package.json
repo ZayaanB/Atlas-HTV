@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "check": "node --env-file-if-exists=.env --import tsx src/check.ts",
     "profile:assistant": "node --import tsx src/profile-assistant-context.ts",
+    "evaluate:assistant": "node --import tsx src/evaluate-assistant.ts",
     "verify:connections": "node --env-file-if-exists=.env --import tsx src/verify-connections.ts",
     "verify:gemini": "node --env-file-if-exists=.env --import tsx src/verify-gemini.ts",
     "setup:tiger": "node --env-file-if-exists=.env --import tsx src/setup-tiger.ts",

@@ -5,6 +5,7 @@ import {
 import { featureSchemas, type FeatureContracts } from "./schemas/workspace.js";
 import { assistantStreamEventSchema, type AssistantStreamEventContract } from "./schemas/assistant-stream.js";
 import { researchSchemas, type ResearchContracts } from "./schemas/assistant-research.js";
+import { assistantV3Schemas, type AssistantV3Contracts } from './schemas/assistant-v3.js';
 import type { FromSchema } from "json-schema-to-ts";
 import { newsQuerySchema } from "./schemas/api.js";
 import { windSchemas, type WindContracts } from "./schemas/wind.js";
@@ -31,6 +32,7 @@ export const schemas = {
   ...windSchemas,
   ...featureSchemas,
   ...assistantV2Schemas,
+  ...assistantV3Schemas,
   ...researchSchemas,
   AssistantStreamEvent: assistantStreamEventSchema,
   NewsQuery: newsQuerySchema,
@@ -50,7 +52,7 @@ export type SchemaName = keyof typeof schemas;
 // Resolve schemas individually: inferring the entire registry as a generic union
 // makes TypeScript expand unrelated response schemas at every validation call.
 export type ContractMap = FeatureContracts &
-  AssistantV2Contracts & ResearchContracts & WindContracts & {
+  AssistantV2Contracts & AssistantV3Contracts & ResearchContracts & WindContracts & {
     AssistantStreamEvent: AssistantStreamEventContract;
     NewsQuery: FromSchema<typeof newsQuerySchema>;
     Article: FromSchema<typeof articleSchema>;
@@ -121,3 +123,9 @@ export type AssistantSourcesReadArgs = Contract<"AssistantSourcesReadArgs">;
 export type AssistantHistoryReadArgs = Contract<"AssistantHistoryReadArgs">;
 export type AssistantResearchRecord = Contract<"AssistantResearchRecord">;
 export type AssistantToolResult = Contract<"AssistantToolResult">;
+export type AssistantRequestV3 = Contract<'AssistantRequestV3'>;
+export type AssistantResponseV3 = Contract<'AssistantResponseV3'>;
+export type AssistantDraftV3 = Contract<'AssistantDraftV3'>;
+export type AssistantWorkspaceSnapshotV3 = Contract<'AssistantWorkspaceSnapshotV3'>;
+export type AssistantStreamEventV3 = Contract<'AssistantStreamEventV3'>;
+export type UIActionV3 = Contract<'UIActionV3'>;

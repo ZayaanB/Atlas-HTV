@@ -8,10 +8,20 @@ import { Retrieval } from '../src/services/retrieval.js';
 import { Flights } from '../src/services/flights.js';
 import { Assistant } from '../src/services/gemini/orchestrator.js';
 import type pg from 'pg';
-import { deferred, testContracts, TestRepository } from './support.js';
+import { deferred, protocolArticle, testContracts, TestRepository } from './support.js';
 test('configuration fails closed without exposing credentials and accepts valid bounds',() => {
   for (const env of [{PORT:'x'},{DATABASE_URL:'postgres://secret@host/db?sslmode=no-verify'},{GEMINI_API_KEY:'secret'},{AI_MAX_TOOL_CALLS:'999'},{FLIGHTS_ENABLED:'yes'}]) assert.throws(() => readConfig(env));
   assert.equal(readConfig({PORT:'3100'}).port,3100);
+});
+test('demo configuration overrides old research caps while ordinary profiles and explicit uncapped research remain available',()=>{
+  const demo=readConfig({NODE_ENV:'test',AI_DEMO_MODE:'true',AI_MAX_ROUNDS:'6',AI_MAX_TOOL_CALLS:'8',AI_REQUEST_TIMEOUT_MS:'50000',AI_MAX_CONTEXT_BYTES:'128000',AI_MAX_OUTPUT_TOKENS:'16384',AI_MAX_CONCURRENT:'2'});
+  assert.equal(demo.aiMaxRounds,0); assert.equal(demo.aiMaxTools,0); assert.equal(demo.aiTimeoutMs,600000);
+  assert.equal(demo.aiMaxContextBytes,1048576); assert.equal(demo.aiMaxOutputTokens,65536); assert.equal(demo.aiConcurrency,8);
+  const ordinary=readConfig({NODE_ENV:'test'});
+  assert.equal(ordinary.aiDemoMode,false); assert.equal(ordinary.aiMaxRounds,4); assert.equal(ordinary.aiMaxTools,8);
+  const uncapped=readConfig({AI_MAX_ROUNDS:'0',AI_MAX_TOOL_CALLS:'0'});
+  assert.equal(uncapped.aiMaxRounds,0); assert.equal(uncapped.aiMaxTools,0);
+  assert.throws(()=>readConfig({AI_DEMO_MODE:'yes'}),/Invalid AI_DEMO_MODE/);
 });
 test('liveness is usable without setup; readiness/data accurately report missing contracts',async () => {
   const app = await buildApp(readConfig({NODE_ENV:'test'}));
@@ -54,6 +64,25 @@ function appServices(config: ReturnType<typeof readConfig>, repository = new Tes
   const contracts = testContracts(), retrieval = new Retrieval(contracts,repository), flights = new Flights(contracts,config,[]);
   return {contracts,repository,retrieval,flights,assistant:new Assistant(config,contracts,retrieval,flights)};
 }
+test('demo chat bypasses the assistant throttle and the short manual HTTP deadline without disabling other route limits',async()=>{
+  const config={...readConfig({NODE_ENV:'test',AI_DEMO_MODE:'true',RATE_LIMIT_MAX:'1'}),requestTimeoutMs:10};
+  const services=appServices(config,new TestRepository({news:[protocolArticle()],sources:[{id:'source-test-record',title:'Synthetic source',url:'https://example.invalid/test-record'}]}));
+  let calls=0;
+  services.assistant=new Assistant(config,services.contracts,services.retrieval,services.flights,{generate:async()=>{
+    calls++; await new Promise(resolve=>setTimeout(resolve,20));
+    return {content:{role:'model',parts:[]},text:'',calls:[{name:'respond',args:{answer:'Demo response',citations:[{record_id:'test-record',source_id:'source-test-record'}],result_ids:['test-record'],actions:[]}}]};
+  }});
+  const app=await buildApp(config,services);
+  try {
+    for(let index=0;index<14;index++) {
+      const response=await app.inject({method:'POST',url:'/api/assistant',payload:{request_id:`demo-${index}`,message:'Continue researching',timezone:'UTC',filters:{}}});
+      assert.equal(response.statusCode,200,response.body); assert.equal(response.json().answer,'Demo response');
+    }
+    assert.equal(calls,14);
+    assert.equal((await app.inject('/api/health/live')).statusCode,200);
+    assert.equal((await app.inject('/api/health/live')).statusCode,429);
+  } finally {await app.close();}
+});
 test('rate limiting returns a stable 429 envelope and Retry-After rather than a 500',async () => {
   const config = readConfig({NODE_ENV:'test',RATE_LIMIT_MAX:'1'}), app = await buildApp(config,appServices(config));
   try {

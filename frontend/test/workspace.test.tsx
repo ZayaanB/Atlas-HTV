@@ -179,7 +179,7 @@ it("keeps current-page map/feed IDs together through pagination, empty pages, an
   expect(screen.getByRole("button", { name: "Previous page" })).toBeEnabled();
 });
 
-it("does not fetch on panning and applies bounds only after Search this area", async () => {
+it("does not fetch or change bounds when panning or returning to globe", async () => {
   const user = userEvent.setup(),
     api = createFixtureApi();
   const spy = vi.spyOn(api, "news");
@@ -189,12 +189,10 @@ it("does not fetch on panning and applies bounds only after Search this area", a
   await user.click(screen.getByRole("button", { name: "Pan map" }));
   expect(spy).toHaveBeenCalledTimes(calls);
   expect(useWorkspace.getState().filters.bounds).toBeUndefined();
-  await user.click(screen.getByRole("button", { name: "Search this area" }));
-  await waitFor(() =>
-    expect(spy.mock.lastCall?.[0].bounds).toEqual([-83, 35, -82, 36]),
-  );
+  expect(screen.queryByRole("button", { name: /search this area/i })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Return to globe" }));
-  expect(useWorkspace.getState().filters.bounds).toEqual([-83, 35, -82, 36]);
+  expect(spy).toHaveBeenCalledTimes(calls);
+  expect(useWorkspace.getState().filters.bounds).toBeUndefined();
 });
 
 it("shares selection with map events and emits sourced camera commands from feed selection", async () => {

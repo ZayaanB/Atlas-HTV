@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Contracts} from '../src/services/validation.js';
-import {modelParameters} from '../src/services/gemini/schema.js';
+import {geminiJsonSchema,modelParameters} from '../src/services/gemini/schema.js';
 
 test('model schema projection resolves only local refs and migrates tuples without altering shared validation',()=>{
   const schema={$schema:'http://json-schema.org/draft-07/schema#',$id:'https://example.invalid/NewsQuery',type:'object',properties:{
@@ -34,4 +34,22 @@ test('model hints omit cumulative array maxima while shared runtime still reject
   assert.equal(schema.properties.ids.maxItems,3);
   assert.throws(()=>contracts.parse('List',{ids:['a','b','c','d']}),/Invalid List/);
   assert.deepEqual(contracts.parse('List',{ids:['a','b','c']}),{ids:['a','b','c']});
+});
+test('provider schema projection uses supported unions and typed enums without expanding forbidden elements',()=>{
+  const schema={type:'object',properties:{
+    choice:{oneOf:[{type:'object',properties:{type:{enum:['open']},id:{type:'string',minLength:1,pattern:'^a'}},required:['type','id'],additionalProperties:false}]},
+    actions:{type:'array',items:{oneOf:[{type:'object',properties:{deep:{type:'string'}}}]},maxItems:0},
+  },required:['choice','actions'],additionalProperties:false};
+  const original=structuredClone(schema), projected=geminiJsonSchema(schema);
+  const properties=projected.properties as Record<string,Record<string,unknown>>;
+  assert.equal(properties.choice!.oneOf,undefined);
+  assert.deepEqual(properties.choice!.anyOf,[{type:'object',properties:{type:{type:'string',enum:['open']},id:{type:'string'}},required:['type','id'],additionalProperties:false}]);
+  assert.deepEqual(properties.actions,{type:'array',maxItems:0,items:{type:'null'}});
+  assert.deepEqual(schema,original);
+});
+test('zero array bounds survive contract projection and keep invalid final actions rejected',()=>{
+  const schema={type:'object',properties:{actions:{type:'array',maxItems:0,items:{type:'string'}}},required:['actions'],additionalProperties:false};
+  const contracts=new Contracts({Draft:schema});
+  assert.equal((modelParameters(contracts,'Draft').properties as Record<string,Record<string,unknown>>).actions!.maxItems,0);
+  assert.throws(()=>contracts.parse('Draft',{actions:['forbidden']}),/Invalid Draft/);
 });

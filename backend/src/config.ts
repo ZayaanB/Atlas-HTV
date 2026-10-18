@@ -27,6 +27,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
       throw new AppError('CONFIG_INVALID', 'DATABASE_URL must be PostgreSQL without TLS override parameters', 500);
   }
   const geminiKey = optional('GEMINI_API_KEY'), geminiModel = optional('GEMINI_MODEL');
+  const aiDemoMode = flag('AI_DEMO_MODE');
   const geminiThinkingLevel = optional('GEMINI_THINKING_LEVEL');
   if (geminiThinkingLevel && !['minimal','low','medium','high'].includes(geminiThinkingLevel))
     throw new AppError('CONFIG_INVALID','Invalid GEMINI_THINKING_LEVEL',500);
@@ -49,13 +50,16 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     databaseUrl, databaseCaFile: optional('DATABASE_CA_FILE'),
     contractsModule: optional('ATLAS_CONTRACTS_MODULE'), databaseModule: optional('ATLAS_DATABASE_MODULE'),
     sourceDefinitionsModule: optional('ATLAS_SOURCES_MODULE'),
-    geminiKey, geminiModel, geminiThinkingLevel,
+    geminiKey, geminiModel, geminiThinkingLevel, aiDemoMode,
     embeddingModel, embeddingVersion: embeddingVersion ?? embeddingModel,
     embeddingDimensions: integer('EMBEDDING_DIMENSIONS', 768, 1, 3072),
-    aiTimeoutMs: integer('AI_REQUEST_TIMEOUT_MS', 20000, 100, 60000),
-    aiMaxTools: integer('AI_MAX_TOOL_CALLS', 8, 1, 16), aiMaxRounds: integer('AI_MAX_ROUNDS', 4, 1, 8),
-    aiMaxContextBytes: integer('AI_MAX_CONTEXT_BYTES', 64000, 4000, 128000),
-    aiMaxOutputTokens: integer('AI_MAX_OUTPUT_TOKENS', 8192, 512, 16384),
+    aiTimeoutMs: Math.max(aiDemoMode ? 600000 : 0, integer('AI_REQUEST_TIMEOUT_MS', 20000, 100, 3600000)),
+    // Zero means no iteration/call cap. The request deadline and cancellation
+    // still terminate generation, including a model stuck calling tools.
+    aiMaxTools: aiDemoMode ? 0 : integer('AI_MAX_TOOL_CALLS', 8, 0, 16),
+    aiMaxRounds: aiDemoMode ? 0 : integer('AI_MAX_ROUNDS', 4, 0, 8),
+    aiMaxContextBytes: Math.max(aiDemoMode ? 1048576 : 0, integer('AI_MAX_CONTEXT_BYTES', 128000, 4000, 16777216)),
+    aiMaxOutputTokens: Math.max(aiDemoMode ? 65536 : 0, integer('AI_MAX_OUTPUT_TOKENS', 16384, 512, 65536)),
     windEnabled: env.WIND_ENABLED === undefined ? true : flag('WIND_ENABLED'),
     flightsEnabled, flightsContact, flightsProvider, airlabsKey,
     flightsBudgetDirectory: optional('FLIGHTS_BUDGET_DIRECTORY') ?? fileURLToPath(new URL('../.flight-budget/', import.meta.url)),
@@ -68,7 +72,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     providerTimeoutMs: integer('PROVIDER_TIMEOUT_MS', 8000, 100, 30000),
     ingestionProviderTimeoutMs: integer('INGESTION_PROVIDER_TIMEOUT_MS',30000,100,30000),
     rateMax: integer('RATE_LIMIT_MAX', 120, 1, 1000),
-    aiConcurrency: integer('AI_MAX_CONCURRENT', 2, 1, 8),
+    aiConcurrency: Math.max(aiDemoMode ? 8 : 0, integer('AI_MAX_CONCURRENT', 2, 1, 64)),
     requestTimeoutMs: integer('REQUEST_TIMEOUT_MS',30000,100,60000)
   };
 }

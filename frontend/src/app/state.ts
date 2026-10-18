@@ -46,8 +46,21 @@ export interface PreparedWorkspaceActions {
   investigationId: string | null;
   camera?: CameraIntent;
   timeline?: TimelineIntent;
+  panel?: PanelRoute;
+  aircraftId?: string;
+  basemap?: BasemapPreference;
+  layers?: { flights?: boolean; wind?: boolean };
 }
+type WorkspaceUndo = Pick<WorkspaceState, 'filters' | 'selection' | 'selectedInvestigationId' | 'selectedAircraftId' | 'basemap' | 'flightsEnabled' | 'windEnabled' | 'panel' | 'panelHistory' | 'investigationTab' | 'timelineIntent' | 'viewport'>;
 export interface WorkspaceState {
+  assistantOrigin: PanelRoute | null;
+  activeTimeline: OpenTimelineArgs | null;
+  setActiveTimeline: (target: OpenTimelineArgs) => void;
+  flightsEnabled: boolean;
+  windEnabled: boolean;
+  setLayer: (layer: 'flights' | 'wind', enabled: boolean) => void;
+  workspaceUndo: WorkspaceUndo | null;
+  undoWorkspace: () => void;
   audience: Audience;
   onboardingComplete: boolean;
   audienceStorageAvailable: boolean;
@@ -96,6 +109,31 @@ export interface WorkspaceState {
 /** Factory gives each test/workspace independent state. No server data is persisted. */
 export function createWorkspaceStore() {
   return create<WorkspaceState>((set, get) => ({
+    assistantOrigin: null,
+    activeTimeline: null,
+    setActiveTimeline: target => set(s => {
+      if (JSON.stringify(s.activeTimeline) === JSON.stringify(target)) return {};
+      const requested = s.timelineIntent?.target;
+      const fromAssistant = !!requested && requested.investigation_id === target.investigation_id && requested.series_id === target.series_id
+        && (!requested.observed_from || requested.observed_from === target.observed_from) && (!requested.observed_to || requested.observed_to === target.observed_to);
+      return { activeTimeline: target, ...(fromAssistant ? {} : { contextRevision: s.contextRevision + 1, workspaceUndo: null }) };
+    }),
+    flightsEnabled: false,
+    windEnabled: false,
+    workspaceUndo: null,
+    setLayer: (layer, enabled) => set(s => ({
+      [layer === 'flights' ? 'flightsEnabled' : 'windEnabled']: enabled,
+      ...(!enabled && layer === 'flights' ? { selectedAircraftId: null } : {}),
+      workspaceUndo: null, contextRevision: s.contextRevision + 1,
+    })),
+    undoWorkspace: () => {
+      const previous = get().workspaceUndo;
+      if (!previous) return;
+      const { viewport, ...rest } = previous;
+      set(s => ({ ...rest, workspaceUndo: null, filterUndo: null,
+        cameraCommand: viewport ? { type: 'fit_bounds' as const, bounds: [...viewport.bounds] as typeof viewport.bounds, id: crypto.randomUUID() } : { type: 'return_to_globe' as const, id: crypto.randomUUID() },
+        contextRevision: s.contextRevision + 1 }));
+    },
     ...readAudiencePreference(),
     setAudience: (audience) => {
       if (!isAudience(audience)) return;
@@ -104,12 +142,13 @@ export function createWorkspaceStore() {
     investigationTab: "brief",
     timelineIntent: null,
     filterUndo: null,
-    setInvestigationTab: (investigationTab) => set({ investigationTab }),
+    setInvestigationTab: (investigationTab) => set(s => ({ investigationTab, contextRevision: s.contextRevision + 1, workspaceUndo: null })),
     setTimelineIntent: (timelineIntent) =>
       set((s) => ({ timelineIntent, contextRevision: s.contextRevision + 1 })),
     commitAssistant: (prepared, revision) => {
       if (get().contextRevision !== revision) return false;
       set((s) => ({
+        workspaceUndo: Object.fromEntries(['filters', 'selection', 'selectedInvestigationId', 'selectedAircraftId', 'basemap', 'flightsEnabled', 'windEnabled', 'panel', 'panelHistory', 'investigationTab', 'timelineIntent', 'viewport'].map(key => [key, structuredClone(s[key as keyof WorkspaceState])])) as WorkspaceUndo,
         ...(prepared.filters
           ? {
               filters: prepared.filters,
@@ -118,6 +157,14 @@ export function createWorkspaceStore() {
           : {}),
         selection: prepared.selection,
         selectedInvestigationId: prepared.investigationId,
+        ...(prepared.basemap ? { basemap: prepared.basemap } : {}),
+        ...(prepared.layers?.flights !== undefined ? { flightsEnabled: prepared.layers.flights } : {}),
+        ...(prepared.layers?.wind !== undefined ? { windEnabled: prepared.layers.wind } : {}),
+        ...(prepared.aircraftId ? { selectedAircraftId: prepared.aircraftId } : prepared.layers?.flights === false ? { selectedAircraftId: null } : {}),
+        ...(prepared.panel ? {
+          panel: prepared.panel,
+          panelHistory: s.panel ? [...s.panelHistory, s.panel].slice(-16) : s.panelHistory,
+        } : {}),
         ...(prepared.camera
           ? { cameraCommand: { ...prepared.camera, id: crypto.randomUUID() } }
           : {}),
@@ -154,18 +201,23 @@ export function createWorkspaceStore() {
     openPanel: (panel, root = false) =>
       set((state) => ({
         panel,
-        selectedAircraftId: panel.view === 'aircraft' ? panel.id ?? null : null,
+        assistantOrigin: panel.view === 'assistant' ? (state.panel?.view === 'assistant' ? state.assistantOrigin : state.panel) : state.assistantOrigin,
+        selectedAircraftId: panel.view === 'aircraft' ? panel.id ?? null : panel.view === 'assistant' ? state.selectedAircraftId : null,
+        contextRevision: state.contextRevision + 1,
+        workspaceUndo: null,
         panelHistory: root
           ? []
           : state.panel && state.panel.view !== 'aircraft'
             ? [...state.panelHistory, state.panel].slice(-16)
             : state.panelHistory,
       })),
-    closePanel: () => set({ panel: null, selectedAircraftId: null }),
+    closePanel: () => set(s => ({ panel: null, selectedAircraftId: null, contextRevision: s.contextRevision + 1, workspaceUndo: null })),
     backPanel: () =>
       set((state) => ({
         panel: state.panelHistory.at(-1) ?? null,
         panelHistory: state.panelHistory.slice(0, -1),
+        contextRevision: state.contextRevision + 1,
+        workspaceUndo: null,
         selectedAircraftId: state.panelHistory.at(-1)?.view === 'aircraft' ? state.panelHistory.at(-1)?.id ?? null : null,
       })),
     setSheetExpanded: (sheetExpanded) => set({ sheetExpanded }),
@@ -182,6 +234,7 @@ export function createWorkspaceStore() {
       set((state) => ({
         filters: normalizeNewsQuery({ ...filters, offset: 0 }),
         filterUndo: null,
+        workspaceUndo: null,
         selection: { articleId: null, locationId: null },
         selectedInvestigationId: null,
         cameraCommand: null,
@@ -191,6 +244,7 @@ export function createWorkspaceStore() {
       set((state) => ({
         filters: normalizeNewsQuery({ ...state.filters, offset }),
         filterUndo: null,
+        workspaceUndo: null,
         selection: { articleId: null, locationId: null },
         selectedInvestigationId: null,
         cameraCommand: null,
@@ -199,10 +253,11 @@ export function createWorkspaceStore() {
     select: (selection) =>
       set((state) => ({
         selection,
+        workspaceUndo: null,
         cameraCommand: null,
         contextRevision: state.contextRevision + 1,
       })),
-    selectAircraft: (selectedAircraftId) => set({ selectedAircraftId }),
+    selectAircraft: (selectedAircraftId) => set(s => ({ selectedAircraftId, contextRevision: s.contextRevision + 1, workspaceUndo: null })),
     clearFlights: () => set((state) => {
       const history = state.panelHistory.filter(route => route.view !== 'aircraft');
       return {
@@ -214,13 +269,16 @@ export function createWorkspaceStore() {
     selectInvestigation: (selectedInvestigationId) =>
       set((state) => ({
         selectedInvestigationId,
+        workspaceUndo: null,
         ...(selectedInvestigationId !== state.selectedInvestigationId
           ? { investigationTab: "brief" as const, timelineIntent: null }
           : {}),
         contextRevision: state.contextRevision + 1,
       })),
-    setBasemap: (basemap) => set({ basemap }),
-    setViewport: (viewport) => set({ viewport }),
+    setBasemap: (basemap) => set(s => ({ basemap, contextRevision: s.contextRevision + 1, workspaceUndo: null })),
+    setViewport: (viewport) => set(s => ({ viewport,
+      ...(viewport.userInitiated !== false && JSON.stringify(viewport) !== JSON.stringify(s.viewport) ? { contextRevision: s.contextRevision + 1, workspaceUndo: null } : {}),
+    })),
     searchArea: () => {
       const { viewport, filters } = get();
       if (viewport && isSearchableBounds(viewport.bounds))
@@ -240,7 +298,7 @@ export function createWorkspaceStore() {
         });
     },
     requestCamera: (intent) =>
-      set({ cameraCommand: { ...intent, id: crypto.randomUUID() } }),
+      set(s => ({ cameraCommand: { ...intent, id: crypto.randomUUID() }, contextRevision: s.contextRevision + 1, workspaceUndo: null })),
     acknowledgeCamera: (id) =>
       set((state) =>
         state.cameraCommand?.id === id ? { cameraCommand: null } : {},

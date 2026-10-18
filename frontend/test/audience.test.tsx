@@ -32,8 +32,8 @@ it.each(audienceOptions)('offers and locally remembers $label on the first visit
   expect(screen.getByLabelText('Atlas geographic news workspace')).toHaveAttribute('inert');
   await user.click(within(dialog).getByRole('button',{name:new RegExp(`^${option.label}`)}));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(screen.getByRole('combobox',{name:'Audience'})).toHaveValue(option.id);
-  expect(screen.getByRole('combobox',{name:'Audience'})).toHaveFocus();
+  expect(screen.queryByRole('combobox',{name:'Audience'})).not.toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Open search'})).toHaveFocus();
   expect(JSON.parse(localStorage.getItem(AUDIENCE_STORAGE_KEY)!)).toEqual({audience:option.id,onboardingComplete:true});
   expect(createWorkspaceStore().getState()).toMatchObject({audience:option.id,onboardingComplete:true});
 });
@@ -44,7 +44,7 @@ it('skips to general public and enters directly on a returning visit',async()=>{
   expect(useWorkspace.getState()).toMatchObject({audience:'general_public',onboardingComplete:true});
   view.unmount(); resetVisit(); mount();
   expect(screen.queryByRole('dialog',{name:'How will you use Atlas?'})).not.toBeInTheDocument();
-  expect(screen.getByRole('combobox',{name:'Audience'})).toHaveValue('general_public');
+  expect(screen.queryByRole('combobox',{name:'Audience'})).not.toBeInTheDocument();
 });
 
 it('traps keyboard focus, lets Escape skip, and blocks workspace shortcuts during onboarding',async()=>{
@@ -57,7 +57,7 @@ it('traps keyboard focus, lets Escape skip, and blocks workspace shortcuts durin
   expect(useWorkspace.getState().panel).toBeNull();
   await user.keyboard('{Escape}');
   expect(useWorkspace.getState().onboardingComplete).toBe(true);
-  expect(screen.getByRole('combobox',{name:'Audience'})).toHaveFocus();
+  expect(screen.getByRole('button',{name:'Open search'})).toHaveFocus();
 });
 
 it.each(['{bad json','{}','{"audience":"administrator","onboardingComplete":true}','{"audience":"journalist","onboardingComplete":false}'])('recovers from invalid stored preferences: %s',raw=>{
@@ -71,14 +71,14 @@ it('keeps the session usable when storage reads or writes throw',async()=>{
   resetVisit(); const user=userEvent.setup(); mount();
   await user.click(screen.getByRole('button',{name:'Skip for now'}));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(screen.getByText('Preference kept for this visit only.')).toBeInTheDocument();
-  await user.selectOptions(screen.getByRole('combobox',{name:'Audience'}),'community_organization');
+  await user.click(screen.getByRole('button',{name:'Open assistant'}));
+  await user.selectOptions(screen.getByRole('combobox',{name:'Perspective'}),'community_organization');
   expect(useWorkspace.getState()).toMatchObject({audience:'community_organization',onboardingComplete:true,audienceStorageAvailable:false});
 });
 
 it('preserves filters, camera, investigation, conversation and draft while switching audience; maps community API requests explicitly',async()=>{
   const user=userEvent.setup(), api=createFixtureApi();
-  const assistant=vi.spyOn(api,'assistant'), news=vi.spyOn(api,'news');
+  const assistant=vi.spyOn(api,'assistantV3'), news=vi.spyOn(api,'news');
   const store=useWorkspace.getState();
   store.setAudience('general_public'); store.applyFilters({themes:['flooding']});
   store.selectInvestigation(investigation.investigation.id);
@@ -92,7 +92,7 @@ it('preserves filters, camera, investigation, conversation and draft while switc
   const answer=await screen.findByText(/Assistant explanation unavailable in historical fixture mode/);
   await user.type(screen.getByLabelText('Your question'),'Keep this draft');
   const before=useWorkspace.getState(), articleIds=mapProps.articles.map(a=>a.id), reads=news.mock.calls.length;
-  await user.selectOptions(screen.getByRole('combobox',{name:'Audience'}),'community_organization');
+  await user.selectOptions(screen.getByRole('combobox',{name:'Perspective'}),'community_organization');
   const after=useWorkspace.getState();
   for(const key of ['filters','viewport','selection','selectedInvestigationId','cameraCommand','contextRevision','panel'] as const) expect(after[key]).toEqual(before[key]);
   expect(mapProps.articles.map(a=>a.id)).toEqual(articleIds);
@@ -105,7 +105,7 @@ it('preserves filters, camera, investigation, conversation and draft while switc
   expect(screen.getByRole('button',{name:audienceProfiles.community_organization.questions[0]!})).toBeInTheDocument();
   await user.click(screen.getByRole('button',{name:/Send question/}));
   await waitFor(()=>expect(assistant).toHaveBeenCalledTimes(2));
-  expect(assistant.mock.calls[1]![0]).toMatchObject({audience:'general_public',message:'Keep this draft',filters:before.filters,selected_investigation_id:before.selectedInvestigationId});
+  expect(assistant.mock.calls[1]![0]).toMatchObject({audience:'general_public',message:'Keep this draft',workspace:{filters:before.filters,selection:{investigation_id:before.selectedInvestigationId}}});
 });
 
 it('personalizes prompts and investigation section order without changing supplied facts, sources or access',async()=>{
@@ -116,7 +116,7 @@ it('personalizes prompts and investigation section order without changing suppli
   act(()=>useWorkspace.getState().openPanel({view:'investigation'}));
   const region=await screen.findByRole('region',{name:'Investigation'});
   for(const option of audienceOptions) {
-    await user.selectOptions(screen.getByRole('combobox',{name:'Audience'}),option.id);
+    await user.selectOptions(screen.getByRole('combobox',{name:'Perspective'}),option.id);
     expect(within(region).getAllByRole('heading',{level:3}).map(h=>h.textContent)).toEqual(audienceProfiles[option.id].sections.map(words));
     for(const item of investigation.investigation.items) expect(within(region).getByText(item.text)).toBeInTheDocument();
     expect(within(region).getByRole('button',{name:'Sources'})).toBeEnabled();
@@ -126,7 +126,7 @@ it('personalizes prompts and investigation section order without changing suppli
   act(()=>useWorkspace.getState().openPanel({view:'assistant'}));
   await user.click(screen.getByText('Suggested questions'));
   for(const option of audienceOptions) {
-    await user.selectOptions(screen.getByRole('combobox',{name:'Audience'}),option.id);
+    await user.selectOptions(screen.getByRole('combobox',{name:'Perspective'}),option.id);
     for(const question of audienceProfiles[option.id].questions) expect(screen.getByRole('button',{name:question})).toBeInTheDocument();
   }
 });

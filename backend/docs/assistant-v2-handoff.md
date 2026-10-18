@@ -70,7 +70,10 @@ All fields required:
 Interpretation has no retrieved text. The backend independently checks command
 quotes, negative/meta/quoted wording, and action kinds before advertising action
 tools. V1 retains its existing behavior; v2's conservative command gate supports
-English commands. Uncertain action authorization asks for clarification.
+English commands. Uncertain action authorization permits read-only research; it
+does not produce a generic workspace-permission question. Article discovery
+defaults to a recommendation in chat. Only specific blocking missing details
+require clarification. See assistant-research.md for current history/model budgets.
 
 ### `AssistantFilterPatch` — model tool arguments
 

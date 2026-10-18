@@ -6,7 +6,7 @@ import {modelFailure} from './errors.js';
 import { partialStringProperty } from './stream.js';
 import { generationParameters, modelRequestBytes } from './request.js';
 export interface ModelTurn { content: Content; calls: { name: string; args: unknown; id?: string }[]; text: string }
-export interface ModelOptions { forceTool?: string; onAnswerDelta?: (text: string) => Promise<void> }
+export interface ModelOptions { forceTool?: string; onAnswerDelta?: (text: string) => Promise<void>; systemInstruction?: string }
 export interface Model {
   generate(contents: Content[], declarations: FunctionDeclaration[], signal: AbortSignal, options?: ModelOptions): Promise<ModelTurn>;
 }
@@ -33,7 +33,7 @@ export class Gemini implements Model {
       if (candidate?.finishReason==='MAX_TOKENS') throw new AppError('MODEL_TRUNCATED','Gemini output reached its token limit',502,true);
       if (candidate?.finishReason && !['STOP','FINISH_REASON_UNSPECIFIED'].includes(candidate.finishReason)) throw new AppError('MODEL_OUTPUT_REJECTED','Gemini did not complete a valid response',502);
       if (!content) throw new AppError(response.promptFeedback?.blockReason?'MODEL_OUTPUT_REJECTED':'MODEL_EMPTY','Gemini returned no usable content',502,true);
-      if (Buffer.byteLength(JSON.stringify(content))>64000) throw new AppError('INVALID_MODEL_OUTPUT','Gemini content exceeded the output bound',502);
+      if (Buffer.byteLength(JSON.stringify(content))>(this.config.aiDemoMode ? 524288 : 64000)) throw new AppError('INVALID_MODEL_OUTPUT','Gemini content exceeded the output bound',502);
       return {content,text:(content.parts ?? []).filter(p=>p.thought!==true && typeof p.text==='string').map(p=>p.text).join(''),
         calls:(content.parts ?? []).flatMap(p=>p.functionCall?[{name:string(p.functionCall.name),args:p.functionCall.args ?? {},id:p.functionCall.id}]:[])};
     } catch(error) {throw modelFailure(error);}
@@ -57,7 +57,7 @@ export class Gemini implements Model {
         if (parts.some(p => p.functionCall?.partialArgs?.length || p.functionCall?.willContinue))
           throw new AppError('INVALID_MODEL_OUTPUT', 'Incomplete tool arguments cannot be executed', 502);
         content.parts!.push(...parts);
-        if (Buffer.byteLength(JSON.stringify(content)) > 64000) throw new AppError('INVALID_MODEL_OUTPUT', 'Gemini content exceeded the output bound', 502);
+        if (Buffer.byteLength(JSON.stringify(content)) > (this.config.aiDemoMode ? 524288 : 64000)) throw new AppError('INVALID_MODEL_OUTPUT', 'Gemini content exceeded the output bound', 502);
         json += parts.filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('');
         if (partialStringProperty(json, 'kind') === 'answer') {
           const answer = partialStringProperty(json, 'answer') ?? '';

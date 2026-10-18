@@ -1,6 +1,6 @@
 import type { TimelineIntent } from "../../app/state";
 import { useWorkspace } from "../../app/state";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
   Coverage,
@@ -59,6 +59,10 @@ export function Timeline({
           ),
         ).toISOString()
       : undefined);
+  useEffect(() => {
+    if (seriesId) useWorkspace.getState().setActiveTimeline({ investigation_id: data.investigation.id, series_id: seriesId,
+      ...(start ? { observed_from: start } : {}), ...(end ? { observed_to: end } : {}) });
+  }, [data.investigation.id, seriesId, start, end]);
   // Archives and current readings can share a location and metric. Validate
   // series identity and provenance even with an injected API adapter.
   function validateRows(items: Observation[]) {

@@ -47,14 +47,23 @@ function setup(turns: ModelTurn[], settings = config, clock = Date.now, reposito
 }
 const replies = (contents: Content[]) => contents.flatMap(content => content.parts?.flatMap(part => part.functionResponse ? [object(part.functionResponse.response)] : []) ?? []);
 
+test('v2 demo research can page beyond ordinary round and call caps and still finalize with resolved sources',async()=>{
+  const settings=readConfig({NODE_ENV:'test',AI_DEMO_MODE:'true',ATLAS_CONTRACTS_MODULE:'contracts/dist/index.js'});
+  const turns=[call('interpret_request',intent),...Array.from({length:20},()=>call('search_news')),call('get_article',{id:article.id}),answer()];
+  const bed=setup(turns,settings);
+  const response=await bed.assistant.answer(input);
+  assert.equal(response.mode,'fixture',JSON.stringify(response.errors)); assert.equal(bed.captured.length,23);
+  assert.equal(records(response.citations)[0]!.url,article.url); assert.deepEqual(response.errors,[]);
+});
+
 test('selected investigations and six supplied exchanges do not become an upfront evidence dump', async () => {
   const history = Array.from({ length: 6 }, (_, i) => [{ role: 'user', content: `Question ${i} ` + 'q'.repeat(400) }, { role: 'assistant', content: `Answer ${i} ` + 'a'.repeat(400) }]).flat();
   const testbed = setup([call('interpret_request', intent), call('respond', { kind: 'clarification', answer: '', citations: [], result_ids: [], actions: [], clarification_reason: 'missing_metric' })]);
   const result = await testbed.assistant.answer({ ...input, selected_investigation_id: inv.investigation.id, history });
   assert.equal(result.kind, 'clarification');
-  assert.ok(testbed.captured.every(round => round.bytes < 16000));
+  assert.ok(testbed.captured.every(round => round.bytes < 24000));
   const first = JSON.parse(testbed.captured[1]!.contents[0]!.parts![0]!.text!);
-  assert.equal(first.request.history.length, 2); assert.equal(first.request.history_available, 6);
+  assert.equal(first.request.history.length, 6); assert.equal(first.request.history_available, 6);
   assert.equal(first.request.selection.selected_investigation_id, inv.investigation.id);
   assert.equal(first.evidence, undefined); assert.equal(first.sources, undefined); assert.equal(first.context, undefined);
   assert.ok(!JSON.stringify(testbed.captured).includes('https://www.usgs.gov'));
@@ -208,7 +217,7 @@ test('unexposed investigation records do not become links or discard the answer'
 
 test('general research cannot overwrite filters or read arbitrary unseen articles', async () => {
   const testbed = setup([call('interpret_request', intent), call('search_news', { keyword: 'different' }), call('get_article', { id: article.id }),
-    call('respond', { kind: 'clarification', answer: '', citations: [], result_ids: [], actions: [], clarification_reason: 'ambiguous_intent' })]);
+    call('respond', { kind: 'clarification', answer: '', citations: [], result_ids: [], actions: [], clarification_reason: 'unsupported_coverage' })]);
   const result = await testbed.assistant.answer({ ...input, filters: { keyword: 'existing' } });
   assert.equal(result.kind, 'clarification'); assert.equal(testbed.repository.calls.filter(row => row.name === 'news' || row.name === 'article').length, 0);
   assert.equal(replies(testbed.captured.at(-1)!.contents).filter(reply => reply.kind === 'error').length, 2);
@@ -287,7 +296,7 @@ test('oversized model tool blocks are not dispatched and finalization uses previ
 test('repeated multi-round research compacts complete blocks and refetches evicted results from cache', async () => {
   const signature = 's'.repeat(12000);
   const testbed = setup([call('interpret_request', intent), call('search_news', { offset: 0 }, signature), call('search_news', { offset: 3 }, signature),
-    call('search_news', { offset: 6 }, signature), call('search_news', { offset: 0 }, signature), answer()]);
+    call('search_news', { offset: 6 }, signature), call('search_news', { offset: 0 }, signature), answer()], { ...config, aiMaxContextBytes: 48000 });
   const result = await testbed.assistant.answer(input);
   assert.equal(result.mode, 'fixture', JSON.stringify(result.errors));
   assert.ok(testbed.captured.every(round => round.bytes <= 48000)); assert.ok(testbed.diagnostics.some(row => Number(row.compactions) > 0));
@@ -297,7 +306,7 @@ test('repeated multi-round research compacts complete blocks and refetches evict
 });
 
 test('history budgets use complete pairs and never truncate Unicode text', () => {
-  const history = [{ role: 'user', content: '🚀'.repeat(1000) }, { role: 'assistant', content: 'reply' }];
+  const history = [{ role: 'user', content: '🚀'.repeat(4000) }, { role: 'assistant', content: '🚀'.repeat(4000) }];
   assert.equal(initialHistory(history).length, 0); assert.equal(historyPairs(history)[0]!.user, history[0]!.content);
   assert.deepEqual(initialHistory([{ role: 'assistant', content: 'orphan' }]), []);
 });
@@ -335,7 +344,7 @@ test('oversized mandatory qualifiers fail rather than being silently dropped fro
 });
 
 test('prompt budget counts instructions, schemas and signatures, removing whole blocks without modifying parts', () => {
-  const budget = new PromptBudget(config), signature = 's'.repeat(25000);
+  const budget = new PromptBudget({ ...config, aiMaxContextBytes: 48000 }), signature = 's'.repeat(25000);
   const blocks: ResearchBlock[] = Array.from({ length: 3 }, () => ({ contents: [{ role: 'model', parts: [{ functionCall: { name: 'x', args: {} }, thoughtSignature: signature }] }, { role: 'user', parts: [{ functionResponse: { name: 'x', response: {} } }] }], records: [], references: [] }));
   const result = budget.fit({ request: { message: 'Question', history: [] } }, blocks, [{ name: 'respond', parametersJsonSchema: { type: 'object' } }]);
   assert.ok(result.bytes <= 48000); assert.equal(blocks.length, 1); assert.equal(blocks[0]!.contents[0].parts![0]!.thoughtSignature, signature);
@@ -348,6 +357,90 @@ test('compaction evicts receipts that depend on an evicted evidence payload', ()
       { role: 'user', parts: [{ functionResponse: { name: 'x', response: {} } }] }], records: [], references, dependsOn,
   });
   const blocks = [make(['origin'], [], 25000), make([], ['origin'], 100), make(['new'], [], 25000)];
-  new PromptBudget(config).fit({ request: { message: 'Question', history: [] } }, blocks, []);
+  new PromptBudget({ ...config, aiMaxContextBytes: 48000 }).fit({ request: { message: 'Question', history: [] } }, blocks, []);
   assert.equal(blocks.length, 1); assert.deepEqual(blocks[0]!.references, ['new']);
+});
+
+
+test('discovery and legacy short replies research instead of stopping at ambiguous intent', async () => {
+  const legacy = 'Would you like me to change the workspace, or answer using the current view?';
+  const history = [
+    { role: 'user', content: 'Find me an interesting article' }, { role: 'assistant', content: legacy },
+    { role: 'user', content: 'change the workspace dumbass' }, { role: 'assistant', content: legacy },
+  ];
+  for (const message of ['Find me an interesting article', 'find me an interesting article damn it', 'yes', 'another one', 'tell me more']) {
+    const testbed = setup([call('interpret_request', { ...intent, clarification_reason: 'ambiguous_intent' }),
+      call('search_news'), call('get_article', { id: article.id }), answer()]);
+    const result = await testbed.assistant.answer({ ...input, message, history });
+    assert.equal(result.kind, 'answer', JSON.stringify(result.errors));
+    assert.deepEqual(result.actions, []);
+    assert.equal(records(result.citations).length, 1);
+    const packed = object(JSON.parse(testbed.captured[1]!.contents[0]!.parts![0]!.text!).request);
+    assert.equal(packed.message, message); assert.equal(records(packed.history).length, 2);
+    assert.ok(testbed.repository.calls.some(row => row.name === 'news'));
+  }
+});
+
+test('a rejected action interpretation still permits research but never exposes action tools', async () => {
+  const testbed = setup([call('interpret_request', { ...intent,
+    actions: [{ type: 'focus_location', quote: 'zoom to Asheville' }] }), call('search_news'), answer()]);
+  const result = await testbed.assistant.answer({ ...input, message: 'Explain how to zoom to Asheville' });
+  assert.equal(result.kind, 'answer'); assert.deepEqual(result.actions, []);
+  assert.ok(testbed.captured.slice(1).every(round => !round.names.includes('focus_location')));
+});
+
+test('configured context above 48 KB retains intact evidence blocks and six recent exchanges', () => {
+  const signature = 's'.repeat(25000);
+  const blocks: ResearchBlock[] = Array.from({ length: 3 }, () => ({ contents: [
+    { role: 'model', parts: [{ functionCall: { name: 'x', args: {} }, thoughtSignature: signature }] },
+    { role: 'user', parts: [{ functionResponse: { name: 'x', response: {} } }] },
+  ], records: [], references: [] }));
+  const result = new PromptBudget(config).fit({ request: { message: 'Question', history: [] } }, blocks, []);
+  assert.ok(result.bytes > 48000 && result.bytes <= config.aiMaxContextBytes);
+  assert.equal(blocks.length, 3);
+  const history = Array.from({ length: 6 }, (_, i) => [
+    { role: 'user', content: String(i) + '🚀'.repeat(500) }, { role: 'assistant', content: 'a'.repeat(1000) },
+  ]).flat();
+  assert.equal(initialHistory(history).length, 6);
+  assert.equal(initialHistory(history)[0]!.user, history[0]!.content);
+});
+
+test('history compaction removes oldest complete exchanges while preserving recent context', () => {
+  const history = [{ user: 'old', assistant: 'x'.repeat(3000) }, { user: 'recent', assistant: 'short' }];
+  const base = { request: { message: 'Question', history } };
+  const settings = { ...config, aiMaxContextBytes: modelRequestBytes(config, [{ role: 'user', parts: [{ text: JSON.stringify({ request: { message: 'Question', history: history.slice(1) } }) }] }], []) + 10 };
+  const result = new PromptBudget(settings).fit(base, [], []);
+  const packed = object(JSON.parse(result.contents[0]!.parts![0]!.text!).request);
+  assert.deepEqual(packed.history, history.slice(1)); assert.equal(base.request.history.length, 2);
+});
+
+
+test('a generic final clarification gets one bounded research recovery instead of the old permission question', async () => {
+  const testbed = setup([call('interpret_request', intent),
+    call('respond', { kind: 'clarification', answer: '', citations: [], result_ids: [], actions: [], clarification_reason: 'ambiguous_intent' }),
+    call('search_news'), answer()]);
+  const result = await testbed.assistant.answer({ ...input, message: 'Find me an interesting article' });
+  assert.equal(result.kind, 'answer'); assert.deepEqual(result.actions, []);
+  assert.equal(testbed.captured.length, 4);
+  const root = JSON.parse(testbed.captured[2]!.contents[0]!.parts![0]!.text!);
+  assert.ok(root.state.clarification_recovery);
+});
+
+
+test('repeated generic clarification is bounded and never replays the old workspace question', async () => {
+  const clarify = () => call('respond', { kind: 'clarification', answer: '', citations: [], result_ids: [], actions: [], clarification_reason: 'ambiguous_intent' });
+  const testbed = setup([call('interpret_request', intent), clarify(), clarify()]);
+  const result = await testbed.assistant.answer({ ...input, message: 'yes' });
+  assert.equal(testbed.captured.length, 3); assert.equal(result.kind, 'clarification');
+  assert.equal(result.answer, 'Which topic or place would you like to explore?');
+  assert.deepEqual(result.actions, []);
+});
+
+test('a dismissal can finish briefly without evidence retrieval or workspace changes', async () => {
+  const testbed = setup([call('interpret_request', intent), call('respond', {
+    kind: 'answer', answer: 'Okay.', citations: [], result_ids: [], actions: [], clarification_reason: null,
+  })]);
+  const result = await testbed.assistant.answer({ ...input, message: 'fuck off' });
+  assert.equal(result.answer, 'Okay.'); assert.deepEqual(result.actions, []);
+  assert.deepEqual(testbed.repository.calls.map(row => row.name), ['freshness']);
 });

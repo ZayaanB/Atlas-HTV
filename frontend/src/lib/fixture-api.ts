@@ -64,9 +64,26 @@ function matches(article: Article, query: NewsQuery): boolean {
     return false;
   return true;
 }
-export function createFixtureApi(): AtlasApi {
+export function createFixtureApi(assistantVersion: 2 | 3 = 3): AtlasApi {
   return {
     mode: "fixture",
+    async article(id, signal) {
+      signal.throwIfAborted();
+      const item = news.items.find(row => row.id === id);
+      if (!item) throw new Error('That article is not in the historical collection.');
+      return item;
+    },
+    ...(assistantVersion === 3 ? { assistantV3: async (request, signal) => {
+      signal.throwIfAborted();
+      readContract('AssistantRequestV3', request);
+      return readContract('AssistantResponseV3', {
+        protocol_version: 3, request_id: request.request_id, conversation_id: request.conversation_id ?? crypto.randomUUID(),
+        context: request.workspace, research_scope: request.workspace.filters, references: [], pending: null,
+        kind: 'answer', answer: 'Assistant explanation unavailable in historical fixture mode. Explore the source-linked records or use manual controls.',
+        citations: [], result_ids: [], actions: [], coverage: news.coverage, mode: 'fallback', search: null, resolved_range: null, timeline: null,
+        errors: [{ code: 'FIXTURE_MODE', message: 'No Gemini or provider request was made.', retryable: false }],
+      });
+    } } satisfies Partial<AtlasApi> : {}),
     async workspace(signal) {
       signal.throwIfAborted();
       const { default: data } = await import(

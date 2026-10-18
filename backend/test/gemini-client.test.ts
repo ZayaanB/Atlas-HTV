@@ -1,12 +1,23 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {GenerateContentResponse,FinishReason,FunctionCallingConfigMode} from '@google/genai';
+import {GenerateContentResponse,FinishReason,FunctionCallingConfigMode,type GenerateContentParameters} from '@google/genai';
 import {Gemini} from '../src/services/gemini/client.js';
 import {readConfig} from '../src/config.js';
 import {modelFailure} from '../src/services/gemini/errors.js';
 
 const config=readConfig({NODE_ENV:'test',GEMINI_API_KEY:'synthetic-secret-key',GEMINI_MODEL:'synthetic-model'});
 const declaration={name:'search_news',parametersJsonSchema:{type:'object',properties:{}}};
+test('demo SDK configuration gives reasoning and signatures room beyond the ordinary 64 KB content cap',async()=>{
+  const response=new GenerateContentResponse();
+  response.candidates=[{finishReason:FinishReason.STOP,content:{role:'model',parts:[{text:'x'.repeat(70000),thought:true},{functionCall:{name:'search_news',args:{}}}]}}];
+  const demo=readConfig({NODE_ENV:'test',AI_DEMO_MODE:'true',GEMINI_API_KEY:'synthetic-key',GEMINI_MODEL:'synthetic-model'});
+  const sdk={models:{generateContent:async(params:GenerateContentParameters)=>{
+    assert.equal(params.config!.maxOutputTokens,65536); return response;
+  }}};
+  const turn=await new Gemini(demo,sdk).generate([],[declaration],new AbortController().signal);
+  assert.equal(turn.text,''); assert.equal(turn.calls[0]!.name,'search_news');
+  await assert.rejects(new Gemini(config,{models:{generateContent:async()=>response}}).generate([],[declaration],new AbortController().signal),/output bound/);
+});
 test('SDK adapter preserves original model parts/signatures, suppresses thought text and manually controls tool calling',async () => {
   const response=new GenerateContentResponse();
   const content={role:'model',parts:[{text:'private synthetic reasoning',thought:true},{functionCall:{name:'search_news',args:{},id:'call-1'},thoughtSignature:'synthetic-signature'}]};
@@ -54,7 +65,7 @@ test('production finalization requires declared tools and uses bounded output/th
     return response;
   }}});
   assert.equal((await model.generate([],[{name:'respond',parametersJsonSchema:{type:'object'}}],new AbortController().signal)).calls[0]!.name,'respond');
-  for (const env of [{AI_MAX_OUTPUT_TOKENS:'16385'},{AI_MAX_OUTPUT_TOKENS:'511'},{GEMINI_THINKING_LEVEL:'unbounded'}])
+  for (const env of [{AI_MAX_OUTPUT_TOKENS:'65537'},{AI_MAX_OUTPUT_TOKENS:'511'},{GEMINI_THINKING_LEVEL:'unbounded'}])
     assert.throws(()=>readConfig(env),/Invalid/);
 });
 
@@ -72,6 +83,22 @@ test('failure diagnostics distinguish provider errors, transport timeouts and DN
     const failure=modelFailure(error);
     assert.equal(failure.code,code);assert.equal(failure.retryable,true);assert.ok(failure.message.includes(fragment));
     assert.ok(!JSON.stringify(failure).includes('private')); assert.ok(!failure.message.includes(privateMessage));
+  }
+});
+
+test('HTTP 400 diagnostics identify the configuration area using fixed text and never echo provider content', () => {
+  for (const [message,code,fragment] of [
+    ['GenerateContentRequest.tools[0].function_declarations[8].parameters_json_schema.properties: should be non-empty for OBJECT type','GEMINI_REQUEST_REJECTED','empty object'],
+    ['response_json_schema: schema too complex with too many states','GEMINI_REQUEST_REJECTED','complexity limit'],
+    ['generationConfig.responseJsonSchema: unsupported schema','GEMINI_REQUEST_REJECTED','structured answer schema'],
+    ['functionDeclarations: invalid parameters','GEMINI_REQUEST_REJECTED','function declaration'],
+    ['thinking_config.thinking_level is unsupported','GEMINI_REQUEST_REJECTED','thinking configuration'],
+    ['API_KEY_INVALID','GEMINI_AUTH_FAILED','API key'],
+  ]) {
+    const error=Object.assign(new Error(JSON.stringify({error:{message:`${message}; synthetic-private-prompt-and-key https://private.invalid/`}})),{status:400});
+    const failure=modelFailure(error);
+    assert.equal(failure.code,code); assert.match(failure.message,new RegExp(fragment!));
+    assert.ok(!failure.message.includes('synthetic')); assert.ok(!failure.message.includes('private.invalid'));
   }
 });
 
