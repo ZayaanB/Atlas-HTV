@@ -7,6 +7,21 @@
   isolation: isolate;
   overflow: hidden;
 }
+.atlas-map::before {
+  content: "";
+  position: absolute;
+  top: 15%;
+  right: 6%;
+  width: min(54vw, 720px);
+  aspect-ratio: 3 / 1;
+  pointer-events: none;
+  transform: rotate(-24deg);
+  /* NASA reference, softly cropped to its dust band. The full dark sky stays underneath. */
+  background: url("./assets/milky-way.jpg") center / cover no-repeat;
+  mask-image: radial-gradient(ellipse at center, #000 12%, transparent 70%);
+  filter: grayscale(0.55);
+  opacity: 0.12;
+}
 .atlas-map__canvas {
   position: absolute;
   inset: 0;
