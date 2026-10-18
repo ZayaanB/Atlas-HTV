@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./Icon";
 import {AudienceSelect} from './AudienceSelect';
 import { useWorkspace } from "../app/state";
@@ -40,6 +40,16 @@ export function Panel({
     previousOpen = useRef(false),
     touchStart = useRef<number | null>(null),
     dragged = useRef(false);
+  useLayoutEffect(() => {
+    const node = root.current;
+    if (!open || fullscreen || !node?.animate ||
+      (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+    const animation = node.animate(
+      [{ transform: "translateX(calc(100% + 24px))", opacity: 0 }, { transform: "translateX(0)", opacity: 1 }],
+      { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    );
+    return () => animation.cancel();
+  }, [open, viewKey, fullscreen]);
   useEffect(() => {
     if (typeof matchMedia !== "function") return;
     const media = matchMedia("(max-width:1199px)");
@@ -108,7 +118,7 @@ export function Panel({
     <aside
       ref={root}
       hidden={!open}
-      className={`content-panel ${sheetExpanded ? "is-expanded" : ""} ${fullscreen ? "is-fullscreen" : ""}`}
+      className={`content-panel ${panel?.view === "assistant" ? "is-assistant" : ""} ${sheetExpanded ? "is-expanded" : ""} ${fullscreen ? "is-fullscreen" : ""}`}
       role={modal ? "dialog" : "complementary"}
       aria-modal={modal ? true : undefined}
       aria-label={title}
@@ -155,6 +165,12 @@ export function Panel({
           </h1>
         </div>
         <div className="panel-header-actions">
+          {mobile && panel?.view === "assistant" && (
+            <button className="icon-button" aria-label={sheetExpanded ? "Collapse panel" : "Expand panel"}
+              onClick={() => setSheetExpanded(!sheetExpanded)}>
+              <Icon name={sheetExpanded ? "collapse" : "expand"} />
+            </button>
+          )}
           {allowFullscreen && (
             <button
               className="icon-button"
@@ -175,7 +191,7 @@ export function Panel({
           </button>
         </div>
       </header>
-      {modal && <div className="panel-audience"><AudienceSelect /></div>}
+      {modal && panel?.view !== "assistant" && <div className="panel-audience"><AudienceSelect /></div>}
       <div className="panel-body" ref={body}>
         {children}
       </div>

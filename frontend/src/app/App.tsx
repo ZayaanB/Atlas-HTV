@@ -195,7 +195,7 @@ export function App({
             : {
                 top: 0,
                 right: 0,
-                bottom: height * (state.sheetExpanded ? 0.82 : 0.38) + 20,
+                bottom: height * (state.sheetExpanded ? 0.82 : panel?.view === "assistant" ? 0.76 : 0.38) + 20,
                 left: 0,
               }
           : { top: 0, right: 0, bottom: 0, left: 0 },
@@ -204,7 +204,7 @@ export function App({
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [panelOpen, state.sheetExpanded]);
+  }, [panelOpen, panel?.view, state.sheetExpanded]);
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
       if (!state.onboardingComplete) return;
@@ -843,7 +843,7 @@ export function App({
               </button>
             </p>
           ))}
-        <div hidden={panel?.view !== "assistant"}>
+        <div className="assistant-view" hidden={panel?.view !== "assistant"}>
           <AssistantPanel
             session={assistant}
             fixture={api.mode === "fixture"}

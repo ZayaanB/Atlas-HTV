@@ -124,6 +124,7 @@ it('personalizes prompts and investigation section order without changing suppli
     expect(within(region).getByRole('button',{name:'Evidence'})).toBeEnabled();
   }
   act(()=>useWorkspace.getState().openPanel({view:'assistant'}));
+  await user.click(screen.getByText('Suggested questions'));
   for(const option of audienceOptions) {
     await user.selectOptions(screen.getByRole('combobox',{name:'Audience'}),option.id);
     for(const question of audienceProfiles[option.id].questions) expect(screen.getByRole('button',{name:question})).toBeInTheDocument();

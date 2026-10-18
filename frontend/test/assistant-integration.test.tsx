@@ -479,6 +479,9 @@ it("renders escaped plain text, original citation links, date-only metadata, and
   expect(links[0]).toHaveAttribute("href", base.url);
   expect(links[0]).toHaveAttribute("target", "_blank");
   expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
+  const sources = screen.getByText('Sources', { selector: 'summary' });
+  expect(sources.closest('details')).not.toHaveAttribute('open');
+  await user.click(sources);
   expect(screen.getAllByText("2024-09-27")).toHaveLength(3);
   await user.click(screen.getByRole("button", { name: "Show all 5 sources" }));
   expect(screen.getAllByText("2024-09-27")).toHaveLength(5);
@@ -810,7 +813,8 @@ it('follows streaming while at the bottom and preserves the reading position aft
   const stream = streamingApi(), client = createQueryClient();
   const view = render(<QueryClientProvider client={client}><div className="panel-body"><Harness api={stream.api} /></div></QueryClientProvider>);
   await send();
-  const body = view.container.querySelector<HTMLElement>('.panel-body')!;
+  const body = screen.getByRole('region', { name: 'Conversation' });
+  expect(body).not.toContainElement(screen.getByLabelText('Your question'));
   Object.defineProperty(body, 'scrollHeight', { value: 1000, configurable: true });
   Object.defineProperty(body, 'clientHeight', { value: 200, configurable: true });
   body.scrollTop = 100; fireEvent.scroll(body);
@@ -823,4 +827,27 @@ it('follows streaming while at the bottom and preserves the reading position aft
     stream.event({ type: 'complete', response: rawResponse(stream.request.request_id, { answer: 'First words continue [1].' }) }); stream.close();
   });
   await screen.findAllByRole('link', { name: /Source 1/ });
+});
+
+it('sends with Enter, keeps Shift+Enter for new lines, and focuses suggested questions in the pinned composer', async () => {
+  const assistant = vi.fn(async (request: AssistantRequestV2) => response(request.request_id));
+  mount({ ...createFixtureApi(), assistant });
+  const user = userEvent.setup(), input = screen.getByLabelText('Your question');
+  await user.click(screen.getByText('Suggested questions'));
+  await user.click(screen.getByRole('button', { name: /What local events/ }));
+  expect(input).toHaveFocus();
+  await user.clear(input);
+  await user.type(input, 'First line{Shift>}{Enter}{/Shift}Second line');
+  expect(input).toHaveValue('First line\nSecond line');
+  expect(assistant).not.toHaveBeenCalled();
+  await user.keyboard('{Enter}');
+  await screen.findByText(/Synthetic integration answer/);
+  expect(assistant).toHaveBeenCalledTimes(1);
+  expect(assistant.mock.calls[0]![0].message).toBe('First line\nSecond line');
+  const sources = screen.getByText('Sources', { selector: 'summary' });
+  expect(sources.closest('details')).not.toHaveAttribute('open');
+  await user.click(screen.getByText('Suggested questions'));
+  await user.click(screen.getByRole('button', { name: /What local events/ }));
+  expect(input).toHaveFocus();
+  expect(screen.getByText('Suggested questions').closest('details')).not.toHaveAttribute('open');
 });
