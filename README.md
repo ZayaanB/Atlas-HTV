@@ -1,8 +1,12 @@
 # Atlas
 
-Geographic news and evidence workspace with a Mapbox globe, satellite exploration, a Gemini research assistant, Tiger Data timelines, and a bounded aircraft overlay.
+**Every headline happens somewhere. Follow it there.**
 
-Product scope: [Final PRD](atlas_prd.md).
+A flood. A water outage. A neighbourhood changing around you. The headline catches your attention, but understanding the story means finding the place, connecting the reporting, and figuring out what the evidence actually supports.
+
+Atlas puts that investigation on a globe. Fly into a city, follow its stories, explore historical measurements and dated imagery, then ask Gemini to help you make sense of what you've found. Original sources stay within reach as you explore.
+
+We built Atlas for the moment curiosity turns into “I want to understand this.” Whether you're following your community, chasing a story, or researching a business connection, there's somewhere to start—and a trail to follow.
 
 ## Start the app locally
 
