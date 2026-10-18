@@ -65,6 +65,28 @@ function mount(api: AtlasApi) {
 }
 beforeEach(() => useWorkspace.setState(useWorkspace.getInitialState(), true));
 
+it('opens the assistant directly from the AI dock button without losing drafts or filters',async()=>{
+  const user=userEvent.setup(), fixture=createFixtureApi();
+  const assistant=vi.spyOn(fixture,'assistant');
+  useWorkspace.getState().applyFilters({themes:['flooding']});
+  // Injected fixture responses exercise the API-mode shell without live providers.
+  mount({...fixture,mode:'api'});
+  expect(screen.queryByText('Stored reporting')).not.toBeInTheDocument();
+  const dock=within(screen.getByRole('navigation',{name:'Workspace'}));
+  expect(dock.getAllByRole('button').map(button=>button.getAttribute('aria-label'))).toEqual(['Open search','Open news','Open assistant']);
+  const before=useWorkspace.getState().filters;
+  await user.click(dock.getByRole('button',{name:'Open assistant'}));
+  expect(dock.getByRole('button',{name:'Open assistant'})).toHaveAttribute('aria-pressed','true');
+  expect(dock.getByRole('button',{name:'Open search'})).toHaveAttribute('aria-pressed','false');
+  await user.type(screen.getByLabelText('Your question'),'Keep my question');
+  await user.click(dock.getByRole('button',{name:'Open assistant'}));
+  expect(useWorkspace.getState().panel).toBeNull();
+  await user.click(dock.getByRole('button',{name:'Open assistant'}));
+  expect(screen.getByLabelText('Your question')).toHaveValue('Keep my question');
+  expect(useWorkspace.getState().filters).toEqual(before);
+  expect(assistant).not.toHaveBeenCalled();
+});
+
 it("keeps current-page map/feed IDs together through pagination, empty pages, and filters", async () => {
   const user = userEvent.setup();
   useWorkspace.getState().applyFilters({ limit: 2 });

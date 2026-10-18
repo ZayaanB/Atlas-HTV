@@ -1,6 +1,6 @@
 # Atlas frontend
 
-A full-screen dark Mapbox workspace with on-demand panels. The design follows the approved Night Earth · Dark reference using dark cartography instead of night imagery. Search and News are the two dock actions; all content uses one floating panel or a responsive bottom sheet.
+A full-screen dark Mapbox workspace with on-demand panels. The design follows the approved Night Earth · Dark reference using dark cartography instead of night imagery. Search, News and AI are the dock actions; all content uses one floating panel or a responsive bottom sheet. The robot/AI button opens the existing assistant. Map controls sit above attribution, and above the dock on narrow screens. Coverage remains available from News; explicit historical fixture labels remain visible in fixture mode.
 
 ## Run locally
 

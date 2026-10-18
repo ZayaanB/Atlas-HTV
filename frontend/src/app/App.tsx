@@ -356,17 +356,13 @@ export function App({
           <span className="brand">ATLAS</span>
           <AudienceSelect />
           {!state.audienceStorageAvailable && <span role="status" className="audience-storage-note">Preference kept for this visit only.</span>}
-          <button
-            className={`coverage-badge ${api.mode === "fixture" ? "historical" : ""}`}
+          {api.mode === 'fixture' && <button
+            className="coverage-badge historical"
             onClick={() => state.openPanel({ view: "coverage" })}
           >
             <span className="status-dot" />
-            {api.mode === "fixture"
-              ? "Historical fixture mode · 2024"
-              : news.isError
-                ? "Reporting unavailable"
-                : "Stored reporting"}
-          </button>
+            Historical fixture mode · 2024
+          </button>}
         </header>
         {news.isError && !panel && (
           <div className="workspace-notice" role="alert">
@@ -559,9 +555,7 @@ export function App({
           <nav className="dock" aria-label="Workspace">
             <button
               aria-label="Open search"
-              aria-pressed={
-                panel?.view === "search" || panel?.view === "assistant"
-              }
+              aria-pressed={panel?.view === "search"}
               onClick={() =>
                 panel?.view === "search"
                   ? state.closePanel()
@@ -582,6 +576,14 @@ export function App({
             >
               <Icon name="news" />
               News
+            </button>
+            <button
+              aria-label="Open assistant"
+              aria-pressed={panel?.view === 'assistant'}
+              onClick={() => panel?.view === 'assistant' ? state.closePanel() : ask()}
+            >
+              <Icon name="robot" />
+              AI
             </button>
           </nav>
         </div>
