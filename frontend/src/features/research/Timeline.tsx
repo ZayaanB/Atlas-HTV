@@ -71,6 +71,8 @@ export function Timeline({
             {
               location_id: series!.location_id,
               metric: series!.metric,
+              // A curated archive and a live series can share location + metric; select exactly this one.
+              series_id: series!.id,
               ...(start ? { observed_from: start } : {}),
               ...(end ? { observed_to: end } : {}),
               limit: 100,
@@ -111,6 +113,7 @@ export function Timeline({
           {
             location_id: series!.location_id,
             metric: series!.metric,
+            series_id: series!.id,
             ...(start ? { observed_from: start } : {}),
             ...(end ? { observed_to: end } : {}),
             limit: 100,
@@ -205,11 +208,17 @@ export function Timeline({
           <option key={s.id} value={s.id}>
             {words(s.metric)} ·{" "}
             {data.locations.find((l) => l.id === s.location_id)?.name}
+            {s.live ? " · current readings" : ""}
           </option>
         ))}
       </select>
       <p>{series.description}</p>
-      <p className="meta">{series.unit} · raw observations · historical</p>
+      <p className="meta">
+        {series.unit} · raw observations ·{" "}
+        {series.live
+          ? "refreshed from the provider; recent values are provisional and may be revised"
+          : "historical"}
+      </p>
       <form
         className="date-form"
         onSubmit={(e) => {

@@ -35,13 +35,13 @@ test('cloud writes require the explicit initialize flag and selected existing se
   assert.throws(() => setupOptions(['--create']),/Use --service/);
 });
 test('runtime verification requires the least-privilege role and readable completed schema, closing connections on every outcome',async () => {
-  for (const result of [{role:'atlas_runtime',migrations:5,privileged:false},{role:'tsdbadmin',migrations:5,privileged:true},{role:'atlas_runtime',migrations:4,privileged:false},{role:'atlas_runtime',migrations:5,privileged:true},undefined]) {
+  for (const result of [{role:'atlas_runtime',migrations:migrations.length,privileged:false},{role:'tsdbadmin',migrations:migrations.length,privileged:true},{role:'atlas_runtime',migrations:migrations.length-1,privileged:false},{role:'atlas_runtime',migrations:migrations.length,privileged:true},undefined]) {
     let closed=false;
     const probe=verifyRuntime(readConfig({}),async () => ({query:async sql => {
       assert.match(sql,/^SELECT /); assert.doesNotMatch(sql,/\b(?:ALTER|CREATE|INSERT INTO|UPDATE|DELETE FROM)\s+(?:ROLE|TABLE|SCHEMA|atlas\.)/);
       return {rows:result?[result]:[]};
     },end:async () => {closed=true;}}));
-    if (result?.role==='atlas_runtime' && result.migrations===5 && !result.privileged) await probe;
+    if (result?.role==='atlas_runtime' && result.migrations===migrations.length && !result.privileged) await probe;
     else await assert.rejects(probe,/Runtime role or readable schema/);
     assert.equal(closed,true);
   }

@@ -524,7 +524,11 @@ test("research queries match the frozen database inputs and reject execution fie
   valid("CompareObservationsArgs", query);
   invalid("CompareObservationsArgs", { metric: "discharge" });
   invalid("CompareObservationsArgs", { ...query, offset: 100 });
-  invalid("ObservationsQuery", { ...query, series_id: "not-a-frozen-filter" });
+  // 006: a live series can share a location + metric with a curated archive; series_id selects one of them.
+  valid("ObservationsQuery", { ...query, series_id: "usgs-03451500-discharge" });
+  valid("CompareObservationsArgs", { ...query, series_id: "usgs-03451500-discharge" });
+  invalid("ObservationsQuery", { ...query, series_id: "../usgs-03451500-discharge" });
+  invalid("ObservationsQuery", { ...query, series_id: ["usgs-03451500-discharge"] });
   invalid("ObservationsQuery", { ...query, limit: "100" });
   invalid("InvestigationQuery", { id: "../secret" });
   invalid("FocusLocationArgs", {

@@ -325,6 +325,8 @@ export const observationsQuerySchema = object(
   {
     location_id: recordId,
     metric,
+    // A location + metric can hold a curated archive and a live series; series_id selects exactly one.
+    series_id: recordId,
     observed_from: utcDateTime,
     observed_to: utcDateTime,
     ...pagination,
@@ -554,6 +556,7 @@ export const featureSchemas = {
     {
       location_id: recordId,
       metric,
+      series_id: recordId,
       observed_from: utcDateTime,
       observed_to: utcDateTime,
       limit: pagination.limit,

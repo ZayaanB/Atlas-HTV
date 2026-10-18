@@ -8,6 +8,7 @@ The configuration below is written and partly validated locally. **Nothing has b
 | --- | --- | --- |
 | `Caddyfile` | **Syntax.** `caddy validate` and `caddy fmt` pass (Caddy v2.10.2, official image). **Routing.** Run against the real backend with no credentials: `/api/health/live` returns 200 and `/api/health` returns 503 `not_ready`; data routes return the backend's structured 503; unknown `/api` routes return 404. SPA fallback serves `index.html`, `/evidence/*` serves PNG/JSON and hides `.md`, and a 783 KB body gets 413. **Headers.** All security headers are present. | Automatic HTTPS for a real domain (needs DNS); the CSP against Person 1's real build. |
 | `atlas-backend.service` | Written from Person 3's implemented start/stop behaviour. | Not run under systemd: there is no Linux VM yet. |
+| `atlas-ingest.service` + `atlas-ingest.timer` | Written 2026-10-18. The refresh pass that `node dist/ingest.js --all` runs was exercised locally through a harness (same ingestion code, non-TLS local pool) against a disposable database with real GDACS and USGS responses. | Not installed or run under systemd on the VM. Not enabled against Tiger until migration 006 is applied there. |
 | Accounts and credits | — | Vultr credits and their expiry, the GoDaddy Registry offer and domain eligibility, ongoing costs. **I have no access to these accounts.** A team member must check them before anything is provisioned. |
 
 ## Architecture
@@ -17,7 +18,11 @@ Browser ──HTTPS──▶ Caddy on the Vultr VM (:443, automatic TLS for $ATL
                     ├─ /api/*       → reverse_proxy 127.0.0.1:3001 → Fastify (systemd: atlas-backend, ONE process)
                     │                                                  ├─ Tiger Cloud PostgreSQL (TLS, atlas_runtime role)
                     │                                                  ├─ Gemini API (server-side key)
-                    │                                                  └─ GDELT / NASA RSS (manual ingest), ADSB.lol (disabled)
+                    │                                                  └─ ADSB.lol (disabled)
+                    │
+  systemd timer (every 20 min) → atlas-ingest.service → node dist/ingest.js --all → Tiger Cloud
+                                   ├─ GDELT DOC, NASA RSS, GDACS RSS (news + GDACS event points)
+                                   └─ USGS Water Data API (live gauge series)
                     ├─ /evidence/*  → /opt/atlas/assets/evidence (dated imagery + metadata)
                     └─ everything else → /opt/atlas/frontend/dist (SPA fallback to index.html)
 ```
@@ -120,9 +125,24 @@ sudo tail -n 50 /var/log/caddy/atlas-access.log
 | --- | --- | --- |
 | Database | The Tiger Cloud host and port | Always |
 | Gemini | `generativelanguage.googleapis.com` | Always |
-| News ingest | `api.gdeltproject.org`, `science.nasa.gov` | Manual ingest only |
+| Ingestion | `api.gdeltproject.org`, `science.nasa.gov`, `www.gdacs.org`, `api.waterdata.usgs.gov` | Every 20 minutes once `atlas-ingest.timer` is enabled, or a manual `ingest` |
 | Flights | `api.adsb.lol` | Only after flights are enabled |
 | Certificates | Let's Encrypt / ZeroSSL ACME endpoints | Certificate issue and renewal |
+
+## Scheduled ingestion (after migration 006 is on Tiger)
+
+`atlas-ingest.timer` starts `atlas-ingest.service` 5 minutes after boot and then every 20 minutes (±1 minute jitter). Each pass runs every reviewed source in `scripts/source-definitions/atlas.mjs` once, one at a time: GDELT requests at least 6 s apart, each source bounded to 60 s, and a source in stored backoff is skipped without a request. The pass exits non-zero only if no source succeeded and at least one failed; backoff skips are not failures. It never deletes stored records.
+
+```bash
+sudo cp /opt/atlas/infra/atlas-ingest.service /opt/atlas/infra/atlas-ingest.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start atlas-ingest.service      # one pass now; check the result below before enabling
+sudo journalctl -u atlas-ingest -n 50 --no-pager # one JSON line with a status per source
+sudo systemctl enable --now atlas-ingest.timer
+systemctl list-timers atlas-ingest.timer
+```
+
+Pause it with `sudo systemctl disable --now atlas-ingest.timer`. The API keeps serving stored records either way.
 
 ## Secrets checklist
 

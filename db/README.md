@@ -4,13 +4,15 @@ Atlas uses one Tiger Cloud PostgreSQL service with TimescaleDB and pgvector: rel
 
 | Path | What it is |
 | --- | --- |
-| `migrations/001–005` | Forward-only schema migrations, applied in filename order. |
+| `migrations/001–006` | Forward-only schema migrations, applied in filename order. |
 | `roles/atlas_runtime.sql` | Least-privilege login role for the backend. |
 | `seeds/helene-asheville-2024/` | One complete, source-linked investigation with a real USGS observation series (provenance in `SOURCES.md`). |
 | `handoff/database.mjs` | Reviewed, parameterized SQL for every plan Person 3 needs (`atlas-p3-v1`). |
 | `checks/validate-handoff.mts` | Runs every plan through the backend's own repository against a **disposable local** database. |
 
 ## Status: what was and was not verified (2026-10-17)
+
+> **Update 2026-10-18 (live ingestion, branch `feat/yathurshan/live-data`).** Migrations 001–005, the runtime role and the Helene seed are on Tiger Cloud. Migration `006_live` and its two write plans are **validated locally only**. On a fresh disposable database (001–006, the runtime role and the seed), `checks/validate-handoff.mts` passes 124 checks. A local end-to-end pass wrote real GDACS alerts and four live USGS series through the backend's ingestion code, and a second pass was idempotent. 006 is **not applied to Tiger** yet; see [Live ingestion (006)](#live-ingestion-006). The table below is the original 2026-10-17 record.
 
 | Verified locally | Not yet verified (needs external setup) |
 | --- | --- |
@@ -27,7 +29,7 @@ Run these as the service owner (`tsdbadmin` on Tiger Cloud), from the repository
 ```bash
 # ATLAS_ADMIN_DATABASE_URL is a local shell variable only (never committed, never in backend/.env).
 for f in db/migrations/001_extensions.sql db/migrations/002_records.sql db/migrations/003_observations.sql \
-         db/migrations/004_embeddings.sql db/migrations/005_aircraft.sql; do
+         db/migrations/004_embeddings.sql db/migrations/005_aircraft.sql db/migrations/006_live.sql; do
   psql "$ATLAS_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f" || break
 done
 psql "$ATLAS_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -f db/roles/atlas_runtime.sql
@@ -42,6 +44,7 @@ psql "$ATLAS_ADMIN_DATABASE_URL" -c 'SELECT version FROM atlas.schema_migrations
 | `003_observations` | `observation_series`, the hypertable `observations`, the continuous aggregate `observation_daily` with its refresh policy, the view `observation_records`, and `investigation_observations` and `investigation_series`. |
 | `004_embeddings` | `embedding_models` (starts empty), `text_chunks` (with a hash trigger), and `chunk_embeddings` (an untyped `vector`, with a dimension CHECK, an FK to `embedding_models`, and a permission/staleness guard trigger). |
 | `005_aircraft` | **No storage.** It only records the version, and explains why: no consumer exists, and no ODbL or retention policy has been agreed. |
+| `006_live` | Adds `article_locations.link_basis` (`reviewed` by default, or `provider_asserted`). Replaces the `observation_series (location_id, metric)` unique key with `(location_id, metric, source_id)`, so a live series can sit beside a curated archive of the same gauge. Adds `atlas.require()`, which raises when an import plan's precondition fails. |
 
 Migrations never change after they have been applied to a shared service; any change goes in a new numbered file. The backend never creates schema at request time.
 
@@ -58,13 +61,13 @@ psql "$ATLAS_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -f db/seeds/helene-asheville
 
 After the commit, it refreshes `observation_daily` for 2024-09-20 to 2024-10-11. Running it again fails on primary keys, so a seed is never silently merged. See [`seeds/README.md`](seeds/README.md).
 
-## Handoff to Person 3 (frozen schema `005_aircraft`, interface `atlas-p3-v1`)
+## Handoff to Person 3 (frozen schema `006_live`, interface `atlas-p3-v1`)
 
-You can either set `ATLAS_DATABASE_MODULE=db/handoff/database.mjs` (the backend loader accepts `db/`) or copy the module to `backend/handoffs/database.mjs`. It exports all 11 plans: `news`, `semantic_news`, `locations`, `investigation`, `observations`, `sources`, `freshness`, `embedding_chunks`, `upsert_articles`, `upsert_embeddings`, and `mark_refresh`. It also exports `proposedPlans.observation_buckets`, which the current validator would reject, so it is kept separate.
+You can either set `ATLAS_DATABASE_MODULE=db/handoff/database.mjs` (the backend loader accepts `db/`) or copy the module to `backend/handoffs/database.mjs`. It exports all 13 plans: `news`, `semantic_news`, `locations`, `investigation`, `observations`, `sources`, `freshness`, `embedding_chunks`, `upsert_articles`, `upsert_embeddings`, `mark_refresh`, and (since 006) `upsert_event_locations` and `upsert_observation_series`. It also exports `proposedPlans.observation_buckets`, which the current validator would reject, so it is kept separate.
 
 ### Conventions every plan follows
 
-- **Tables and keys.** Everything lives in schema `atlas`. Stable text IDs match `^[a-z0-9][a-z0-9._:-]*$` (at most 160 characters). The unique keys are `sources.url`, `articles.url`, `observation_series (location_id, metric)` and the observations PK `(series_id, observed_at)`. An Observation `id` is `<series_id>@<YYYYMMDDTHHMMSSZ>`.
+- **Tables and keys.** Everything lives in schema `atlas`. Stable text IDs match `^[a-z0-9][a-z0-9._:-]*$` (at most 160 characters). The unique keys are `sources.url`, `articles.url`, `observation_series (location_id, metric, source_id)` (since 006; before it, `(location_id, metric)`) and the observations PK `(series_id, observed_at)`. The `observations` plan takes an optional `series_id` to select one of several series that share a location and metric. An Observation `id` is `<series_id>@<YYYYMMDDTHHMMSSZ>`.
 - **Timestamps.** Stored as `timestamptz`. Returned by `atlas.utc_iso()` as `YYYY-MM-DDTHH:MM:SS.mmmZ`, matching `Date#toISOString`. Dates (`published_date`, event dates) are returned as `YYYY-MM-DD` strings.
 - **Nulls.** Unknown values are SQL `NULL` → JSON `null`. Values are never coerced to `0` or `''`. Every count is cast to `int`, because `pg` would return a bigint as a string.
 - **Arrays.** `location_ids`, `entity_ids`, `themes` and `qualifiers` are `text[]` and arrive as JS arrays. `coordinates` is `[lon, lat]` and `bounds` is `[west, south, east, north]`; both are `json` and arrive as number arrays, or `null`.
@@ -76,11 +79,20 @@ You can either set `ATLAS_DATABASE_MODULE=db/handoff/database.mjs` (the backend 
 
 Each normalized Article becomes **one statement**, which upserts four things: the original `sources` row (by `url`), the `articles` row (by `url`), the provider's `article_discoveries` row (`article_id, provider_source_id`), and the article's embeddable `text_chunks` row (the title, plus the excerpt if one is permitted).
 
-- **No review claims.** Imports are always `unreviewed`. They never write location, entity or theme links, `geographic_precision`, or `event_at`.
+- **No review claims.** Imports are always `unreviewed`. They never write entity or theme links or `geographic_precision`. Since 006, a provider-asserted `event_at` (the GDACS earthquake origin time) is written to unreviewed rows only, and location links are written only through `upsert_event_locations`.
+- **Original-source metadata.** `source_type`, `license`, `license_url` and `attribution` come from the reviewed source definition. A NULL `source_type` means `news_article`, and stored licensing is never erased.
 - **Reviewed rows are protected.** A reviewed row keeps its title, publisher, excerpt and publication facts. A provider rediscovering a curated URL only adds a discovery row; this is tested on the WLOS seed article.
 - **Dates only improve.** A NULL publication time never erases a known one. `discovered_at` keeps the earliest value and `fetched_at` the latest.
 - **Hashing.** `content_hash` is recomputed in SQL from the stored values by `atlas.article_content_hash()`, the same algorithm as `normalizeArticle`.
 - **Failed refreshes.** `mark_refresh` with `last_successful_at = NULL` (a failure) keeps the stored success time and increments `consecutive_failures`. A success clears `next_retry_at`.
+
+### Live ingestion (006)
+
+- **`upsert_event_locations`** runs once per item, after `upsert_articles`. It upserts an **unreviewed** `region`-precision location from the point and alert box the provider published for that item (GDACS today), cites the stored source of that URL, and links it with `link_basis = 'provider_asserted'`. It never updates a reviewed location and never links a reviewed article. Nothing is geocoded or inferred from text. The box is a display extent around the point, not an affected-area footprint, and the map draws these as provisional points.
+- **`upsert_observation_series`** runs once per series refresh. It upserts the series' dataset source (by URL), the series itself (`live = true`; coverage only widens; `retrieved_at` only advances), an optional configured investigation link (appended once), and the readings, passed as one JSON array `readings`. A reading at an existing instant is replaced, because provisional values get revised. `atlas.require` raises if the configured series ID belongs to another location, metric, unit, statistic or source. Send at least one reading, because coverage is computed from them.
+- **Grants.** `roles/atlas_runtime.sql` adds INSERT/UPDATE on `locations`, `article_locations`, `observation_series` and `observations`, plus INSERT on `investigation_series`. Re-run it after 006.
+- **Applying to Tiger** needs explicit authorization and `tsdbadmin`. `npm --prefix backend run setup:tiger -- --initialize` applies only the missing migration (006), re-runs the role grants and preserves the existing seed. The plain psql equivalent is `psql "$ATLAS_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/006_live.sql`, then the same with `-f db/roles/atlas_runtime.sql`.
+- **Compatibility.** The read plans, including `observations` with `series_id`, also work on a 005 database. The two new write plans fail on 005 (missing column, function and grants). The backend then records a failed refresh and keeps stored data. Apply 006 before enabling scheduled ingestion.
 
 ## Field assumptions and contract gaps (for Person 1)
 

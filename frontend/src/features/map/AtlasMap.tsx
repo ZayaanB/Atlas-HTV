@@ -30,6 +30,7 @@ type LocationProperties = {
   precision: Location["precision"];
   articleIds: string[];
   selected: boolean;
+  provisional: boolean;
 };
 
 type LocationGeometry =
@@ -47,7 +48,7 @@ type LocationCollection = {
   features: LocationFeature[];
 };
 
-function makeLocations(
+export function makeLocations(
   articles: readonly Article[],
   locations: readonly Location[],
   selectedArticleId: string | null,
@@ -70,7 +71,21 @@ function makeLocations(
       precision: location.precision,
       articleIds,
       selected: selectedLocations.has(location.id),
+      provisional: location.verification_status === "unreviewed",
     };
+
+    // Unreviewed provider locations (e.g. a GDACS event point with its alert box) are drawn at the point the
+    // provider published, styled as provisional. Their box is a display extent, not an affected area, so it is
+    // never filled as if it were the event footprint.
+    if (location.verification_status === "unreviewed" && location.coordinates) {
+      features.push({
+        type: "Feature",
+        id: location.id,
+        properties,
+        geometry: { type: "Point", coordinates: location.coordinates },
+      });
+      continue;
+    }
 
     // Broad records use only their sourced extent; their optional coordinates are not pins.
     if (location.precision === "city" || location.precision === "region") {
@@ -236,12 +251,22 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
       source: POINT_SOURCE_ID,
       filter: ["!", ["has", "point_count"]],
       paint: {
+        // Provisional (unreviewed provider) points are amber rings; reviewed points stay solid blue.
         "circle-color": [
           "case",
           ["boolean", ["get", "selected"], false],
           "#dcefff",
+          ["boolean", ["get", "provisional"], false],
+          "#f2b35b",
           "#74b9ff",
         ],
+        "circle-opacity": [
+          "case",
+          ["boolean", ["get", "provisional"], false],
+          0.35,
+          1,
+        ],
+        "circle-stroke-opacity": 1,
         "circle-radius": [
           "interpolate",
           ["linear"],
@@ -253,7 +278,12 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
           14,
           10,
         ],
-        "circle-stroke-color": "#14242d",
+        "circle-stroke-color": [
+          "case",
+          ["boolean", ["get", "provisional"], false],
+          "#f2b35b",
+          "#14242d",
+        ],
         "circle-stroke-width": 2.5,
       },
     });

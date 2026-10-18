@@ -1,0 +1,16 @@
+# Atlas scheduled ingestion timer (Person 4). Install as /etc/systemd/system/atlas-ingest.timer, then
+#   systemctl daemon-reload && systemctl enable --now atlas-ingest.timer
+# 20 minutes is the PRD's conservative 15–30 minute target: an Atlas choice, not a provider freshness guarantee.
+# GDACS republishes continuously; USGS gauges report every 15 minutes; GDELT sources back off after any 429.
+[Unit]
+Description=Run Atlas ingestion every 20 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=20min
+RandomizedDelaySec=60
+Persistent=true
+Unit=atlas-ingest.service
+
+[Install]
+WantedBy=timers.target

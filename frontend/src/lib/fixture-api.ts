@@ -95,6 +95,7 @@ export function createFixtureApi(): AtlasApi {
           (o) =>
             (!query.location_id || o.location_id === query.location_id) &&
             (!query.metric || o.metric === query.metric) &&
+            (!query.series_id || o.series_id === query.series_id) &&
             (!query.observed_from || o.observed_at >= query.observed_from) &&
             (!query.observed_to || o.observed_at <= query.observed_to),
         )

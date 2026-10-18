@@ -1,4 +1,4 @@
-// Person 4 → Person 3: reviewed, parameterized SQL for the frozen Atlas schema (migrations 001–005).
+// Person 4 → Person 3: reviewed, parameterized SQL for the frozen Atlas schema (migrations 001–006).
 // Interface: backend/docs/database-handoff.md ("atlas-p3-v1"). SQL text is trusted developer configuration;
 // request values only ever arrive as bound parameters listed in `parameters`, in placeholder order.
 //
@@ -8,9 +8,10 @@
 // unknown values are NULL. Column lists that depend on Person 1's closed schemas are single constants below.
 //
 // Validated against a disposable local TimescaleDB 2.30.2 / pgvector 0.8.7 / PostgreSQL 17 database through
-// node-postgres (see db/README.md). NOT yet run against Tiger Cloud.
+// node-postgres (see db/README.md). Migrations 001–005 run on Tiger Cloud; 006 and its live-ingestion plans are
+// validated locally only until they are applied there.
 
-export const schemaVersion = '005_aircraft';
+export const schemaVersion = '006_live';
 
 const iso = column => `atlas.utc_iso(${column})`;
 
@@ -183,7 +184,8 @@ WHERE i.id = $1::text`,
       parameters: ['id']
     },
 
-    // Raw observations: strict location/metric/inclusive observation range before pagination; ascending time.
+    // Raw observations: strict location/metric/series/inclusive observation range before pagination; ascending time.
+    // Since 006 a location + metric can have a curated archive and a live series; series_id selects exactly one.
     observations: {
       text: `SELECT ${OBSERVATION_COLUMNS}
 FROM atlas.observation_records o
@@ -191,9 +193,10 @@ WHERE ($1::text IS NULL OR o.location_id = $1::text)
   AND ($2::text IS NULL OR o.metric = $2::text)
   AND ($3::timestamptz IS NULL OR o.observed_at >= $3::timestamptz)
   AND ($4::timestamptz IS NULL OR o.observed_at <= $4::timestamptz)
+  AND ($7::text IS NULL OR o.series_id = $7::text)
 ORDER BY o.observed_at, o.id
 LIMIT $5::int OFFSET $6::int`,
-      parameters: ['location_id', 'metric', 'observed_from', 'observed_to', 'limit', 'offset']
+      parameters: ['location_id', 'metric', 'observed_from', 'observed_to', 'limit', 'offset', 'series_id']
     },
 
     sources: {
@@ -261,33 +264,43 @@ WHERE c.source_id = $1::text AND c.chunk_id = $2::text`,
 
     // One statement per normalized Article: upserts the original source record, the article, the per-provider
     // discovery row, and the article's embeddable chunk (title + permitted excerpt). Provider rows are always
-    // unreviewed; reviewed rows keep their title/publisher/excerpt/publication facts; reviewed links
-    // (locations/entities/themes), precision and event time are never written by imports; a NULL publication
-    // time never erases a known one; discovered_at keeps the earliest and fetched_at the latest value.
+    // unreviewed; reviewed rows keep their title/publisher/excerpt/publication/event facts; reviewed links
+    // (locations/entities/themes) and precision are never written here (provider-asserted locations go through
+    // upsert_event_locations); a provider-asserted event time (e.g. GDACS fromdate) is written to unreviewed rows
+    // only; a NULL publication or event time never erases a known one; discovered_at keeps the earliest and
+    // fetched_at the latest value. source_type/license/license_url/attribution come from the reviewed source
+    // definition; a NULL source_type means 'news_article', and existing licensing metadata is never erased.
     upsert_articles: {
       text: `WITH src AS (
-  INSERT INTO atlas.sources AS s (id, url, title, publisher, source_type, published_at, published_at_basis, retrieved_at)
-  VALUES ($2::text, $3::text, $4::text, $5::text, 'news_article', $7::timestamptz,
-    CASE WHEN $7::timestamptz IS NULL THEN 'unavailable' ELSE 'feed_asserted' END, $9::timestamptz)
+  INSERT INTO atlas.sources AS s (id, url, title, publisher, source_type, published_at, published_at_basis, retrieved_at,
+    license, license_url, attribution)
+  VALUES ($2::text, $3::text, $4::text, $5::text, COALESCE($14::text, 'news_article'), $7::timestamptz,
+    CASE WHEN $7::timestamptz IS NULL THEN 'unavailable' ELSE 'feed_asserted' END, $9::timestamptz,
+    $15::text, $16::text, $17::text)
   ON CONFLICT (url) DO UPDATE SET
     retrieved_at = GREATEST(s.retrieved_at, EXCLUDED.retrieved_at),
     title = CASE WHEN s.verification_status = 'reviewed' THEN s.title ELSE EXCLUDED.title END,
     publisher = CASE WHEN s.verification_status = 'reviewed' THEN s.publisher ELSE EXCLUDED.publisher END,
     published_at = CASE WHEN s.verification_status = 'reviewed' THEN s.published_at ELSE COALESCE(EXCLUDED.published_at, s.published_at) END,
     published_at_basis = CASE WHEN s.verification_status = 'reviewed' OR EXCLUDED.published_at IS NULL THEN s.published_at_basis ELSE 'feed_asserted' END,
+    license = COALESCE(s.license, EXCLUDED.license),
+    license_url = COALESCE(s.license_url, EXCLUDED.license_url),
+    attribution = COALESCE(s.attribution, EXCLUDED.attribution),
     updated_at = now()
   RETURNING s.id
 ), art AS (
   INSERT INTO atlas.articles AS a (id, source_id, url, title, publisher, excerpt, published_at, publication_time_basis,
-    discovered_at, fetched_at, provider, provider_source_id, verification_status, content_hash)
+    discovered_at, fetched_at, provider, provider_source_id, verification_status, content_hash, event_at)
   SELECT $1::text, src.id, $3::text, $4::text, $5::text, $6::text, $7::timestamptz, $12::text,
-    $8::timestamptz, $9::timestamptz, $10::text, $11::text, 'unreviewed', atlas.article_content_hash($4::text, $6::text)
+    $8::timestamptz, $9::timestamptz, $10::text, $11::text, 'unreviewed', atlas.article_content_hash($4::text, $6::text),
+    $13::timestamptz
   FROM src
   ON CONFLICT (url) DO UPDATE SET
     title = CASE WHEN a.verification_status = 'reviewed' THEN a.title ELSE EXCLUDED.title END,
     publisher = CASE WHEN a.verification_status = 'reviewed' THEN a.publisher ELSE EXCLUDED.publisher END,
     excerpt = CASE WHEN a.verification_status = 'reviewed' THEN a.excerpt ELSE COALESCE(EXCLUDED.excerpt, a.excerpt) END,
     published_at = CASE WHEN a.verification_status = 'reviewed' THEN a.published_at ELSE COALESCE(EXCLUDED.published_at, a.published_at) END,
+    event_at = CASE WHEN a.verification_status = 'reviewed' THEN a.event_at ELSE COALESCE(EXCLUDED.event_at, a.event_at) END,
     publication_time_basis = CASE WHEN a.verification_status = 'reviewed' OR EXCLUDED.published_at IS NULL
       THEN a.publication_time_basis ELSE EXCLUDED.publication_time_basis END,
     discovered_at = LEAST(a.discovered_at, EXCLUDED.discovered_at),
@@ -314,7 +327,86 @@ FROM art
 ON CONFLICT (source_id, chunk_id) DO UPDATE SET text = EXCLUDED.text, permission_basis = EXCLUDED.permission_basis
 WHERE c.text IS DISTINCT FROM EXCLUDED.text`,
       parameters: ['id', 'source_id', 'url', 'title', 'publisher', 'excerpt', 'published_at', 'discovered_at', 'fetched_at',
-        'provider', 'provider_source_id', 'publication_time_basis']
+        'provider', 'provider_source_id', 'publication_time_basis', 'event_at', 'source_type', 'license', 'license_url',
+        'attribution']
+    },
+
+    // One statement per provider-asserted event location (006). Upserts an UNREVIEWED location built from the
+    // coordinates/bounds the provider published for that item, then links it to the stored article with
+    // link_basis 'provider_asserted'. Run it after upsert_articles: article and source are both found by canonical
+    // URL `article_url` (a curated row may own that URL under a different ID), the location cites that source, and
+    // the article is linked only while unreviewed. Reviewed locations are never updated; if the configured ID
+    // already belongs to a reviewed location, nothing is linked. No geocoding or text inference happens here.
+    upsert_event_locations: {
+      text: `WITH loc AS (
+  INSERT INTO atlas.locations AS l (id, name, precision, longitude, latitude, coordinates_basis,
+    bounds_west, bounds_south, bounds_east, bounds_north, bounds_basis, source_id, verification_status)
+  VALUES ($2::text, $3::text, $4::text, $5::float8, $6::float8, $7::text,
+    $8::float8, $9::float8, $10::float8, $11::float8, $12::text, (SELECT s.id FROM atlas.sources s WHERE s.url = $1::text), 'unreviewed')
+  ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name, precision = EXCLUDED.precision, longitude = EXCLUDED.longitude, latitude = EXCLUDED.latitude,
+    coordinates_basis = EXCLUDED.coordinates_basis, bounds_west = EXCLUDED.bounds_west, bounds_south = EXCLUDED.bounds_south,
+    bounds_east = EXCLUDED.bounds_east, bounds_north = EXCLUDED.bounds_north, bounds_basis = EXCLUDED.bounds_basis,
+    source_id = EXCLUDED.source_id, updated_at = now()
+  WHERE l.verification_status = 'unreviewed'
+  RETURNING l.id
+)
+INSERT INTO atlas.article_locations (article_id, location_id, link_basis)
+SELECT a.id, loc.id, 'provider_asserted'
+FROM loc JOIN atlas.articles a ON a.url = $1::text AND a.verification_status = 'unreviewed'
+ON CONFLICT (article_id, location_id) DO NOTHING`,
+      parameters: ['article_url', 'id', 'name', 'precision', 'longitude', 'latitude', 'coordinates_basis',
+        'bounds_west', 'bounds_south', 'bounds_east', 'bounds_north', 'bounds_basis']
+    },
+
+    // One statement per live series refresh (006). Upserts the series' original dataset source (by URL), the series
+    // itself (live = true; coverage only widens; retrieved_at only advances) and its readings, passed as one JSON
+    // array `readings` of {observed_at, value, qualifiers}; the caller sends at least one reading (coverage is
+    // computed from them and is NOT NULL). A reading already stored at the same instant is replaced:
+    // provisional provider values can be revised. atlas.require raises if the configured series ID already belongs
+    // to another location/metric/unit/statistic/source, so a misconfiguration never writes into the wrong series.
+    // investigation_id (nullable) links the series to a reviewed investigation once, appended after existing series;
+    // the link is configuration in the reviewed source definition, never inferred.
+    upsert_observation_series: {
+      text: `WITH src AS (
+  INSERT INTO atlas.sources AS s (id, url, title, publisher, source_type, published_at, published_at_basis, retrieved_at,
+    license, license_url, attribution)
+  VALUES ($2::text, $3::text, $4::text, $5::text, 'dataset', NULL, 'unavailable', $16::timestamptz, $13::text, $14::text, $15::text)
+  ON CONFLICT (url) DO UPDATE SET retrieved_at = GREATEST(s.retrieved_at, EXCLUDED.retrieved_at), updated_at = now()
+  RETURNING s.id
+), r AS (
+  SELECT x.observed_at, x.value, COALESCE(x.qualifiers, '{}') AS qualifiers
+  FROM jsonb_to_recordset($19::jsonb) AS x(observed_at timestamptz, value float8, qualifiers text[])
+), series AS (
+  INSERT INTO atlas.observation_series AS os (id, location_id, metric, unit, statistic, expected_interval, source_id,
+    provider_series_ref, description, missing_data_rule, license, attribution, coverage_from, coverage_to, retrieved_at, live)
+  SELECT $1::text, $6::text, $7::text, $8::text, $9::text, make_interval(secs => $10::int), src.id,
+    $11::text, $12::text, $17::text, $13::text, $15::text,
+    (SELECT min(observed_at) FROM r), (SELECT max(observed_at) FROM r), $16::timestamptz, true
+  FROM src
+  ON CONFLICT (id) DO UPDATE SET
+    coverage_from = LEAST(os.coverage_from, EXCLUDED.coverage_from),
+    coverage_to = GREATEST(os.coverage_to, EXCLUDED.coverage_to),
+    retrieved_at = GREATEST(os.retrieved_at, EXCLUDED.retrieved_at),
+    live = true
+  WHERE atlas.require(os.location_id = EXCLUDED.location_id AND os.metric = EXCLUDED.metric AND os.unit = EXCLUDED.unit
+    AND os.statistic = EXCLUDED.statistic AND os.source_id = EXCLUDED.source_id, 'series ID belongs to another series identity')
+  RETURNING os.id, os.statistic
+), link AS (
+  INSERT INTO atlas.investigation_series (investigation_id, series_id, position)
+  SELECT $18::text, series.id,
+    (SELECT COALESCE(max(x.position) + 1, 0) FROM atlas.investigation_series x WHERE x.investigation_id = $18::text)
+  FROM series WHERE $18::text IS NOT NULL
+  ON CONFLICT (investigation_id, series_id) DO NOTHING
+)
+INSERT INTO atlas.observations AS o (series_id, statistic, observed_at, value, qualifiers, time_precision, fetched_at)
+SELECT series.id, series.statistic, r.observed_at, r.value, r.qualifiers, 'instant', $16::timestamptz
+FROM series CROSS JOIN r
+ON CONFLICT (series_id, observed_at) DO UPDATE SET
+  value = EXCLUDED.value, qualifiers = EXCLUDED.qualifiers, fetched_at = EXCLUDED.fetched_at`,
+      parameters: ['id', 'source_id', 'source_url', 'source_title', 'publisher', 'location_id', 'metric', 'unit', 'statistic',
+        'expected_interval_seconds', 'provider_series_ref', 'description', 'license', 'license_url', 'attribution',
+        'retrieved_at', 'missing_data_rule', 'investigation_id', 'readings']
     },
 
     // FK to atlas.embedding_models rejects unagreed identities; CHECK rejects dimension mismatches; the trigger

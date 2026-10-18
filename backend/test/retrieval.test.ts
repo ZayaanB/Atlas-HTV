@@ -75,3 +75,15 @@ test('comparison computes from one compatible series and rejects mixed units/sou
   repository.data.observations![1]!.unit = 'different';
   await assert.rejects(retrieval.compare({location_id:'test-place',metric:'test-metric'}),/one location/);
 });
+test('series_id selects one of two series sharing a location and metric, in the query and the post-filter',async () => {
+  const row = (id: string, series_id: string, source_id: string, value: number, observed_at: string) =>
+    ({id,series_id,location_id:'test-place',metric:'test-metric',unit:'test-unit',source_id,value,observed_at});
+  const repository = new TestRepository({observations:[row('a1','test-archive','test-archive-source',2,'2024-01-01T00:00:00Z'),
+    row('l1','test-live','test-live-source',5,'2026-01-01T00:00:00Z'),row('l2','test-live','test-live-source',7,'2026-01-02T00:00:00Z')]});
+  const retrieval = new Retrieval(testContracts(),repository);
+  const result = await retrieval.compare({location_id:'test-place',metric:'test-metric',series_id:'test-live'});
+  assert.equal(repository.calls.at(-2)!.input.series_id,'test-live');
+  assert.deepEqual(result.comparison,{first_id:'l1',last_id:'l2',difference:2,unit:'test-unit'});
+  // Without series_id the two sources mix, and comparison refuses rather than diffing across them.
+  await assert.rejects(retrieval.compare({location_id:'test-place',metric:'test-metric'}),/one location/);
+});
