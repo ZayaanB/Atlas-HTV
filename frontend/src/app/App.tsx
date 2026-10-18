@@ -416,10 +416,14 @@ export function App({
                   state.setBasemap(e.target.value as typeof basemap)
                 }
               >
-                <option value="auto">Auto</option>
                 <option value="map">Map</option>
                 <option value="satellite">Satellite</option>
+                <option value="auto">Auto (satellite on zoom)</option>
               </select>
+              <p className="muted">
+                Map stays selected as you zoom. Zoom into streets for 3D
+                buildings and stylized surface textures where available.
+              </p>
               <p className="muted">
                 Satellite imagery is geographic context, not dated event
                 evidence.

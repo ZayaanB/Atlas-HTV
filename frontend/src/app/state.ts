@@ -169,7 +169,7 @@ export function createWorkspaceStore() {
     selection: { articleId: null, locationId: null },
     selectedInvestigationId: null,
     selectedAircraftId: null,
-    basemap: "auto",
+    basemap: "map",
     viewport: null,
     inspectedCoordinates: null,
     cameraCommand: null,
