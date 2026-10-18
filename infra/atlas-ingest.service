@@ -1,0 +1,32 @@
+# Atlas scheduled ingestion — one sequential refresh pass (Person 4). Started by atlas-ingest.timer; see infra/README.md.
+# Install as /etc/systemd/system/atlas-ingest.service. It is a separate short-lived process from atlas-backend: the API
+# keeps serving stored records while this runs, and a failed pass never removes previously stored data.
+[Unit]
+Description=Atlas scheduled ingestion (news, GDACS alerts, USGS live series)
+Documentation=file:///opt/atlas/infra/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=atlas
+Group=atlas
+WorkingDirectory=/opt/atlas/backend
+EnvironmentFile=/etc/atlas/backend.env
+# Sources run one at a time (GDELT >= 6 s apart), each bounded to 60 s; per-source backoff is stored in Tiger.
+ExecStart=/usr/bin/node dist/ingest.js --all
+# Hard ceiling for the whole pass, well inside the timer interval so passes never overlap.
+TimeoutStartSec=15min
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=512M

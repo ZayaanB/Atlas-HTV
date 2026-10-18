@@ -2,7 +2,7 @@
 // The deliberately minimal schemas exercise backend behavior; contracts/ remains authoritative.
 import type { AnySchema } from 'ajv';
 import { Contracts, type Data } from '../src/services/validation.js';
-import type { Read, Repository } from '../src/data/queries.js';
+import type { Read, Repository, Write } from '../src/data/queries.js';
 const text = {type:'string'}, array = {type:'array',items:text,maxItems:100};
 const shape = (properties: Data, required: string[] = [], additionalProperties = false) => ({type:'object',properties,required,additionalProperties});
 const filters = shape({location_ids:array,themes:array,entity_ids:array,keyword:text,semantic_query:text,published_from:text,published_to:text,
@@ -12,8 +12,8 @@ export function testContracts() {
     NewsQuery:filters,
     LocationsQuery:shape({ids:array,query:text,limit:{type:'integer'},offset:{type:'integer'}}),
     InvestigationQuery:shape({id:text},['id']),
-    ObservationsQuery:shape({location_id:text,metric:text,observed_from:text,observed_to:text,limit:{type:'integer'},offset:{type:'integer'}}),
-    CompareObservationsArgs:shape({location_id:text,metric:text,observed_from:text,observed_to:text,limit:{type:'integer'}},['location_id','metric']),
+    ObservationsQuery:shape({location_id:text,metric:text,series_id:text,observed_from:text,observed_to:text,limit:{type:'integer'},offset:{type:'integer'}}),
+    CompareObservationsArgs:shape({location_id:text,metric:text,series_id:text,observed_from:text,observed_to:text,limit:{type:'integer'}},['location_id','metric']),
     FocusLocationArgs:shape({location_id:text},['location_id']),
     FlightsQuery:shape({region_id:text},['region_id']),FindAircraftArgs:shape({region_id:text,identifier:text},['region_id','identifier']),
     FlightRegion:shape({id:text,latitude:{type:'number'},longitude:{type:'number'},radius_nm:{type:'integer'}},['id','latitude','longitude','radius_nm']),
@@ -33,7 +33,7 @@ export class TestRepository implements Repository {
   closed = false;
   constructor(public data: Partial<Record<Read,Data[]>> = {}) {}
   async read(name: Read,input:Data) { this.calls.push({name,input}); return this.data[name] ?? []; }
-  async writeBatch(name:'upsert_articles'|'upsert_embeddings'|'mark_refresh',rows:Data[]) { this.writes.push({name,rows}); }
+  async writeBatch(name:Write,rows:Data[]) { this.writes.push({name,rows}); }
   async health() { return true; }
   async close() { this.closed = true; }
 }

@@ -102,6 +102,7 @@ export class Retrieval {
     const rows = await this.repository.read('observations', { ...query, ...page(query) }, signal);
     const items = rows.map(r => this.contracts.parse('Observation', r, true)).filter(r =>
       (!query.location_id || r.location_id === query.location_id) && (!query.metric || r.metric === query.metric) &&
+      (!query.series_id || r.series_id === query.series_id) &&
       (!query.observed_from || Date.parse(string(r.observed_at)) >= Date.parse(string(query.observed_from))) &&
       (!query.observed_to || Date.parse(string(r.observed_at)) <= Date.parse(string(query.observed_to))))
       .sort((a,b) => Date.parse(string(a.observed_at))-Date.parse(string(b.observed_at))).slice(0,page(query).limit);

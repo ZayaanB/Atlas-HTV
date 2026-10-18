@@ -5,11 +5,14 @@ import { workspacePlan } from './workspace.js';
 export const reads = ['news', 'locations', 'investigation', 'observations', 'sources', 'semantic_news', 'freshness', 'embedding_chunks', 'workspace'] as const;
 export type Read = typeof reads[number];
 export const corePlans: Read[] = ['news','locations','investigation','observations','sources','freshness'];
+// Reviewed write plans. Live ingestion (migration 006) adds event locations and live observation series.
+export const writes = ['upsert_articles','upsert_embeddings','mark_refresh','upsert_event_locations','upsert_observation_series'] as const;
+export type Write = typeof writes[number];
 export interface Repository {
   readonly mode: 'stored' | 'fixture' | 'unavailable';
   readonly missingPlans?: readonly string[];
   read(name: Read, input: Data, signal?: AbortSignal): Promise<Data[]>;
-  writeBatch?(name: 'upsert_articles' | 'upsert_embeddings' | 'mark_refresh', rows: Data[], signal?: AbortSignal): Promise<void>;
+  writeBatch?(name: Write, rows: Data[], signal?: AbortSignal): Promise<void>;
   health(): Promise<boolean>;
   close(): Promise<void>;
 }
@@ -17,14 +20,14 @@ export interface Repository {
 export interface QueryPlan { text: string; parameters: string[] }
 export interface DatabaseHandoff {
   version: 'atlas-p3-v1';
-  plans: Partial<Record<Read | 'upsert_articles' | 'upsert_embeddings' | 'mark_refresh', QueryPlan>>;
+  plans: Partial<Record<Read | Write, QueryPlan>>;
 }
 export function validateDatabaseHandoff(value: unknown): DatabaseHandoff {
   const invalid = () => new AppError('SCHEMA_HANDOFF_INVALID','Expected a versioned database handoff with reviewed query plans',500);
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid();
   const handoff = value as DatabaseHandoff;
   if (handoff.version !== 'atlas-p3-v1' || !handoff.plans || typeof handoff.plans !== 'object' || Array.isArray(handoff.plans)) throw invalid();
-  const names: string[] = [...reads,'upsert_articles','upsert_embeddings','mark_refresh'];
+  const names: string[] = [...reads,...writes];
   for (const [name,plan] of Object.entries(handoff.plans)) {
     if (!names.includes(name) || !plan || typeof plan !== 'object' || typeof plan.text !== 'string' || !plan.text.trim() || plan.text.length > 64000 ||
       !Array.isArray(plan.parameters) || plan.parameters.length > 64 || plan.parameters.some(p => typeof p !== 'string' || !/^[a-z_]+$/.test(p))) throw invalid();
@@ -49,7 +52,7 @@ export class PgRepository implements Repository {
     if (result.rows.length > 10000) throw new AppError('RESULT_TOO_LARGE', 'Database result exceeded its safety bound', 502);
     return result.rows as Data[];
   }
-  async writeBatch(name: 'upsert_articles' | 'upsert_embeddings' | 'mark_refresh', rows: Data[], signal?: AbortSignal) {
+  async writeBatch(name: Write, rows: Data[], signal?: AbortSignal) {
     checkAbort(signal);
     if (rows.length > 1000) throw new AppError('BATCH_TOO_LARGE', 'Import batch exceeds 1000 records');
     const client = await this.pool.connect();

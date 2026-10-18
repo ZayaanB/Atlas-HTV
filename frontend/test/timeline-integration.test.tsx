@@ -68,7 +68,9 @@ it("opens investigation by ID and pages the existing HTTP timeline without works
       ...(raw.limit ? { limit: Number(raw.limit) } : {}),
       ...(raw.offset ? { offset: Number(raw.offset) } : {}),
     });
-    expect(query).not.toHaveProperty("series_id");
+    // A curated archive and a live series can share location + metric (migration 006): the timeline always names
+    // the one series it plots, in both the paged query and the comparison.
+    expect(query.series_id).toBe(series.id);
     const signal = init!.signal as AbortSignal;
     if (url.pathname === "/api/observations/compare")
       return json(
@@ -111,6 +113,7 @@ it("opens investigation by ID and pages the existing HTTP timeline without works
   expect(observationQueries[0]).toMatchObject({
     location_id: series.location_id,
     metric: series.metric,
+    series_id: series.id,
     limit: 100,
     offset: 0,
   });

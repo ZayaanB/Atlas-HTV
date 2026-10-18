@@ -9,7 +9,7 @@ import type {Config} from '../config.js';
 import {AppError} from '../runtime/errors.js';
 import {backendRoot,repoRoot} from '../runtime/load.js';
 const execute = promisify(execFile);
-export const migrations = ['001_extensions','002_records','003_observations','004_embeddings','005_aircraft'] as const;
+export const migrations = ['001_extensions','002_records','003_observations','004_embeddings','005_aircraft','006_live'] as const;
 export function cleanTigerUri(raw: string): URL {
   let uri: URL;
   try {uri = new URL(raw.trim());} catch {throw new AppError('TIGER_URI_INVALID','Tiger CLI did not return a valid database URI',500);}

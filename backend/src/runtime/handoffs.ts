@@ -25,9 +25,12 @@ export async function loadHandoffs(config: Config, root = repoRoot) {
   const databaseHandoff = db ? validateDatabaseHandoff(db.databaseHandoff) : undefined;
   const sources = await loadLocalModule(config.sourceDefinitionsModule,['scripts/source-definitions'],root);
   const sourceDefinitions = definitionList(sources?.sources), regions = definitionList(sources?.regions);
+  const observationSources = definitionList(sources?.observation_sources);
+  if (new Set([...sourceDefinitions,...observationSources].map(item => item.id)).size !== sourceDefinitions.length + observationSources.length)
+    throw new AppError('SOURCE_HANDOFF_INVALID','News and observation source IDs share one refresh-state namespace and must be unique',500);
   if (contracts.has('FlightRegion')) {
     try { regions.forEach(region => contracts.parse('FlightRegion',region)); }
     catch { throw new AppError('SOURCE_HANDOFF_INVALID','Configured regions failed shared FlightRegion validation',500); }
   }
-  return {contracts,databaseHandoff,sourceDefinitions,regions};
+  return {contracts,databaseHandoff,sourceDefinitions,observationSources,regions};
 }

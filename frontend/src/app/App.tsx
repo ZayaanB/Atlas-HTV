@@ -695,13 +695,16 @@ export function App({
                 <dt>Location</dt>
                 <dd>
                   {selected.location_ids
-                    .map(
-                      (id) =>
-                        places.find((p) => p.id === id)?.name ??
-                        research.data?.locations.find((p) => p.id === id)
-                          ?.name ??
-                        "Location unavailable",
-                    )
+                    .map((id) => {
+                      const place =
+                        places.find((p) => p.id === id) ??
+                        research.data?.locations.find((p) => p.id === id);
+                      if (!place) return "Location unavailable";
+                      // Provider-published points (e.g. GDACS) are shown, but never as reviewed geography.
+                      return place.verification_status === "unreviewed"
+                        ? `${place.name} (provider-reported, not reviewed)`
+                        : place.name;
+                    })
                     .join(" · ") || "Not verified"}
                 </dd>
                 <dt>Precision</dt>
@@ -733,7 +736,13 @@ export function App({
                 <summary>Provenance</summary>
                 <dl className="metadata">
                   <dt>Event time</dt>
-                  <dd>{dateTime(selected.event_at)}</dd>
+                  <dd>
+                    {dateTime(selected.event_at)}
+                    {selected.event_at &&
+                    selected.verification_status === "unreviewed"
+                      ? " · provider-reported"
+                      : ""}
+                  </dd>
                   <dt>Discovered</dt>
                   <dd>{dateTime(selected.discovered_at)}</dd>
                   <dt>Fetched</dt>
