@@ -11,6 +11,7 @@ import "./AtlasMap.css";
 import { updateEvidence } from "./EvidenceLayer";
 import { updateFlights, FLIGHT_LAYERS } from "./FlightLayer";
 import { GLOBE_CENTER, homeZoom, homePadding } from "./style";
+import { compactMapLabel, installStoryGlow, startStoryPulse, STORY_GLOW_ID } from "./news-points";
 
 const TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim();
 const EXTENT_SOURCE_ID = "atlas-extent-data";
@@ -27,6 +28,7 @@ const SATELLITE_ZOOM = 8;
 type LocationProperties = {
   locationId: string;
   name: string;
+  label: string;
   precision: Location["precision"];
   articleIds: string[];
   selected: boolean;
@@ -68,6 +70,7 @@ export function makeLocations(
     const properties: LocationProperties = {
       locationId: location.id,
       name: location.name,
+      label: compactMapLabel(location.name),
       precision: location.precision,
       articleIds,
       selected: selectedLocations.has(location.id),
@@ -222,6 +225,7 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
     });
   }
   if (!map.getLayer(POINT_ID)) {
+    installStoryGlow(map, POINT_SOURCE_ID);
     map.addLayer({
       id: CLUSTER_ID,
       type: "circle",
@@ -230,8 +234,8 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
       paint: {
         "circle-color": "#74b9ff",
         "circle-radius": ["step", ["get", "point_count"], 15, 10, 19, 30, 23],
-        "circle-stroke-color": "#14242d",
-        "circle-stroke-width": 2,
+        "circle-stroke-color": "#bbdfff",
+        "circle-stroke-width": 1.5,
       },
     });
     map.addLayer({
@@ -251,19 +255,19 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
       source: POINT_SOURCE_ID,
       filter: ["!", ["has", "point_count"]],
       paint: {
-        // Provisional (unreviewed provider) points are amber rings; reviewed points stay solid blue.
+        // Preserve provider review status: amber rings versus solid reviewed blue.
         "circle-color": [
           "case",
           ["boolean", ["get", "selected"], false],
           "#dcefff",
           ["boolean", ["get", "provisional"], false],
-          "#f2b35b",
+          "#ffbd69",
           "#74b9ff",
         ],
         "circle-opacity": [
           "case",
           ["boolean", ["get", "provisional"], false],
-          0.35,
+          0.55,
           1,
         ],
         "circle-stroke-opacity": 1,
@@ -272,7 +276,7 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
           ["linear"],
           ["zoom"],
           1,
-          4,
+          5,
           8,
           7,
           14,
@@ -281,10 +285,10 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
         "circle-stroke-color": [
           "case",
           ["boolean", ["get", "provisional"], false],
-          "#f2b35b",
-          "#14242d",
+          "#ffcf91",
+          "#b5ddff",
         ],
-        "circle-stroke-width": 2.5,
+        "circle-stroke-width": 1.8,
       },
     });
   }
@@ -294,9 +298,12 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
       type: "symbol",
       source: EXTENT_SOURCE_ID,
       layout: {
-        "text-field": ["get", "name"],
+        "text-field": ["get", "label"],
         "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
-        "text-size": 12,
+        "text-size": 11,
+        "text-max-width": 11,
+        "text-line-height": 1.2,
+        "text-padding": 6,
         "text-offset": [0, 1.15],
         "text-anchor": "top",
         "text-allow-overlap": false,
@@ -315,10 +322,13 @@ function installLocationLayers(map: mapboxgl.Map, data: LocationCollection) {
       source: POINT_SOURCE_ID,
       filter: ["!", ["has", "point_count"]],
       layout: {
-        "text-field": ["get", "name"],
+        "text-field": ["get", "label"],
         "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
-        "text-size": 12,
-        "text-offset": [0, 1.15],
+        "text-size": 11,
+        "text-max-width": 11,
+        "text-line-height": 1.2,
+        "text-padding": 6,
+        "text-offset": [0, 1.4],
         "text-anchor": "top",
         "text-allow-overlap": false,
       },
@@ -366,6 +376,7 @@ export function AtlasMap(props: AtlasMapProps) {
     features: [],
   });
   const currentStyleRef = useRef<"map" | "satellite">("map");
+  const styleReadyRef = useRef(false);
   const handledCommandsRef = useRef(new Set<string>());
   const programmaticMotionRef = useRef(false);
   const homeRef = useRef(true);
@@ -425,6 +436,7 @@ export function AtlasMap(props: AtlasMapProps) {
 
     let firstStyleLoad = true;
     const installStyle = () => {
+      styleReadyRef.current = true;
       map.setProjection({ name: "globe" });
       map.setFog({
         color: "#131b2a",
@@ -441,6 +453,8 @@ export function AtlasMap(props: AtlasMapProps) {
         firstStyleLoad = false;
         setMapReady(true);
       }
+      // Reconcile a preference changed while the replacement style was loading.
+      synchronizeStyle();
     };
     let userNavigation = false;
     const publishViewport = () => {
@@ -459,10 +473,11 @@ export function AtlasMap(props: AtlasMapProps) {
       });
     };
     const synchronizeStyle = () => {
-      if (!TOKEN || !map.isStyleLoaded()) return;
+      if (!TOKEN || !styleReadyRef.current) return;
       const nextStyle = styleFor(propsRef.current.basemap, map.getZoom());
       if (nextStyle === currentStyleRef.current) return;
       currentStyleRef.current = nextStyle;
+      styleReadyRef.current = false;
       map.setStyle(styleUrl(nextStyle));
     };
     const moveEnd = () => {
@@ -477,6 +492,7 @@ export function AtlasMap(props: AtlasMapProps) {
           FILL_ID,
           CLUSTER_ID,
           POINT_ID,
+          STORY_GLOW_ID,
           EXTENT_LABEL_ID,
           POINT_LABEL_ID,
           ...FLIGHT_LAYERS,
@@ -573,6 +589,7 @@ export function AtlasMap(props: AtlasMapProps) {
     map.on("moveend", moveEnd);
     map.on("click", click);
     map.on("error", mapErrorHandler);
+    const stopStoryPulse = startStoryPulse(map, () => styleReadyRef.current);
     const canvasContainer = map.getCanvasContainer();
     canvasContainer.addEventListener("pointerdown", stopProgrammaticMotion, {
       passive: true,
@@ -583,6 +600,7 @@ export function AtlasMap(props: AtlasMapProps) {
     canvasContainer.addEventListener("keydown", stopProgrammaticMotion);
 
     return () => {
+      stopStoryPulse();
       canvasContainer.removeEventListener(
         "pointerdown",
         stopProgrammaticMotion,
@@ -597,22 +615,27 @@ export function AtlasMap(props: AtlasMapProps) {
       observer.disconnect();
       map.remove();
       mapRef.current = null;
+      styleReadyRef.current = false;
       programmaticMotionRef.current = false;
     };
   }, []);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    // A paint animation / pending tiles can make isStyleLoaded false even
+    // though our sources exist. Do not lose an incoming news page in that gap.
+    // A replacement style installs the latest dataRef in its style.load hook.
+    if (!map || !map.getSource(POINT_SOURCE_ID)) return;
     installLocationLayers(map, locationData);
   }, [locationData]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!TOKEN || !map || !map.isStyleLoaded()) return;
+    if (!TOKEN || !map || !styleReadyRef.current) return;
     const nextStyle = styleFor(props.basemap, map.getZoom());
     if (nextStyle === currentStyleRef.current) return;
     currentStyleRef.current = nextStyle;
+    styleReadyRef.current = false;
     map.setStyle(styleUrl(nextStyle));
   }, [props.basemap, mapReady]);
 
@@ -700,11 +723,11 @@ export function AtlasMap(props: AtlasMapProps) {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (map?.isStyleLoaded()) updateEvidence(map, props.evidenceOverlay);
+    if (map && styleReadyRef.current) updateEvidence(map, props.evidenceOverlay);
   }, [mapReady, props.evidenceOverlay]);
   useEffect(() => {
     const map = mapRef.current;
-    if (map?.isStyleLoaded()) updateFlights(map, props);
+    if (map && styleReadyRef.current) updateFlights(map, props);
   }, [mapReady, props.aircraft, props.selectedAircraftId]);
   useEffect(() => {
     const map = mapRef.current;
