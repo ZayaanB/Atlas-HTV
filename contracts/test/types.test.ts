@@ -231,3 +231,6 @@ const researchDump: import("../index.js").AssistantResearchRecord = { ...researc
 // @ts-expect-error Discovery categories are a closed enum.
 const arbitraryDatabase: import("../index.js").AssistantCatalogSearchArgs = { kind: "sql" };
 void [researchSearch, researchArticle, researchInvestigation, researchCatalog, researchLocations, researchSources, researchHistory, researchRecord, researchResult, researchDump, arbitraryDatabase];
+type _GlobalAircraft = Expect<Equal<import('../index.js').FlightGlobalResponse['items'][number], import('../index.js').AircraftState>>;
+type _FlightProvider = Expect<Equal<import('../index.js').AircraftState['provider'], 'adsb.lol' | 'airlabs'>>;
+type _GlobalPause = Expect<Equal<import('../index.js').FlightGlobalResponse['pause_reason'], 'quota' | 'authentication' | 'configuration' | null>>;

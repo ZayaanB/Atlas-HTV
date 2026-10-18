@@ -41,7 +41,8 @@ export function normalizeQuery(raw: unknown): Data {
   for (const key of ['location_ids', 'themes', 'entity_ids', 'ids', 'event_types', 'topics']) {
     if (typeof query[key] === 'string') query[key] = query[key].split(',');
   }
-  for (const key of ['limit', 'offset']) if (typeof query[key] === 'string' && /^\d+$/.test(query[key])) query[key] = Number(query[key]);
+  for (const key of ['limit', 'offset', 'radius_nm']) if (typeof query[key] === 'string' && /^\d+$/.test(query[key])) query[key] = Number(query[key]);
+  for (const key of ['latitude', 'longitude']) if (typeof query[key] === 'string' && /^-?\d+(?:\.\d+)?$/.test(query[key])) query[key] = Number(query[key]);
   if (typeof query.bounds === 'string') query.bounds = query.bounds.split(',').map(Number);
   if (query.has_location === 'true') query.has_location = true;
   else if (query.has_location === 'false') query.has_location = false;

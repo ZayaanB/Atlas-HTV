@@ -82,6 +82,7 @@ export interface WorkspaceState {
   setPage: (offset: number) => void;
   select: (selection: MapSelection) => void;
   selectAircraft: (id: string | null) => void;
+  clearFlights: () => void;
   selectInvestigation: (id: string | null) => void;
   setBasemap: (basemap: BasemapPreference) => void;
   setViewport: (viewport: ViewportSnapshot) => void;
@@ -129,8 +130,9 @@ export function createWorkspaceStore() {
                 id: prepared.timeline.target.investigation_id,
               },
               panelHistory: s.panel
-                ? [...s.panelHistory, s.panel].slice(-16)
+                ? [...s.panelHistory, ...(s.panel.view === 'aircraft' ? [] : [s.panel])].slice(-16)
                 : s.panelHistory,
+              selectedAircraftId: null,
             }
           : {}),
         contextRevision: s.contextRevision + 1,
@@ -152,17 +154,19 @@ export function createWorkspaceStore() {
     openPanel: (panel, root = false) =>
       set((state) => ({
         panel,
+        selectedAircraftId: panel.view === 'aircraft' ? panel.id ?? null : null,
         panelHistory: root
           ? []
-          : state.panel
+          : state.panel && state.panel.view !== 'aircraft'
             ? [...state.panelHistory, state.panel].slice(-16)
             : state.panelHistory,
       })),
-    closePanel: () => set({ panel: null }),
+    closePanel: () => set({ panel: null, selectedAircraftId: null }),
     backPanel: () =>
       set((state) => ({
         panel: state.panelHistory.at(-1) ?? null,
         panelHistory: state.panelHistory.slice(0, -1),
+        selectedAircraftId: state.panelHistory.at(-1)?.view === 'aircraft' ? state.panelHistory.at(-1)?.id ?? null : null,
       })),
     setSheetExpanded: (sheetExpanded) => set({ sheetExpanded }),
     filters: { limit: 50, offset: 0 },
@@ -199,6 +203,14 @@ export function createWorkspaceStore() {
         contextRevision: state.contextRevision + 1,
       })),
     selectAircraft: (selectedAircraftId) => set({ selectedAircraftId }),
+    clearFlights: () => set((state) => {
+      const history = state.panelHistory.filter(route => route.view !== 'aircraft');
+      return {
+        selectedAircraftId: null,
+        panel: state.panel?.view === 'aircraft' ? history.at(-1) ?? null : state.panel,
+        panelHistory: state.panel?.view === 'aircraft' ? history.slice(0, -1) : history,
+      };
+    }),
     selectInvestigation: (selectedInvestigationId) =>
       set((state) => ({
         selectedInvestigationId,

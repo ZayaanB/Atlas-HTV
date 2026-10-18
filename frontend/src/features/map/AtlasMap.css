@@ -119,6 +119,19 @@
   border-radius: 5px;
   pointer-events: none;
 }
+.atlas-map__flight-attribution {
+  position: absolute;
+  max-width: min(330px, calc(100% - 40px));
+  font-size: 11px;
+  line-height: 1.5;
+  color: #f5d547;
+  background: #111317;
+  padding: 6px 10px;
+  border-radius: 5px;
+  pointer-events: none;
+  margin: 0;
+}
+.workspace-canvas[inert] .atlas-map__flight-attribution { display: none; }
 @media (max-width: 1199px) {
   .atlas-map__offline {
     top: 102px;

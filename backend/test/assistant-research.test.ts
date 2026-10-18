@@ -6,6 +6,8 @@ import { readConfig } from '../src/config.js';
 import { loadHandoffs } from '../src/runtime/handoffs.js';
 import { Assistant } from '../src/services/gemini/orchestrator.js';
 import { Retrieval, matchesNews } from '../src/services/retrieval.js';
+import { Embeddings } from '../src/services/embeddings.js';
+import { filterKeys } from '../src/services/gemini/policy.js';
 import { object, records, strings, type Data } from '../src/services/validation.js';
 import type { Model, ModelTurn } from '../src/services/gemini/client.js';
 import { modelRequestBytes } from '../src/services/gemini/request.js';
@@ -35,13 +37,13 @@ class Repository extends TestRepository {
     return rows;
   }
 }
-function setup(turns: ModelTurn[], settings = config, clock = Date.now, repository = new Repository()) {
+function setup(turns: ModelTurn[], settings = config, clock = Date.now, repository = new Repository(), embeddings?: Embeddings) {
   const captured: { contents: Content[]; names: string[]; bytes: number }[] = [], diagnostics: Data[] = [];
   const model: Model = { generate: async (contents, declarations, _signal, options) => {
     captured.push({ contents: structuredClone(contents), names: declarations.map(row => row.name!), bytes: modelRequestBytes(settings, contents, declarations, options) });
     const next = turns.shift(); assert.ok(next, 'Unexpected generation round'); return next;
   } };
-  return { captured, diagnostics, repository, assistant: new Assistant(settings, contracts, new Retrieval(contracts, repository), undefined, model, clock, event => diagnostics.push(event)) };
+  return { captured, diagnostics, repository, assistant: new Assistant(settings, contracts, new Retrieval(contracts, repository, embeddings), undefined, model, clock, event => diagnostics.push(event)) };
 }
 const replies = (contents: Content[]) => contents.flatMap(content => content.parts?.flatMap(part => part.functionResponse ? [object(part.functionResponse.response)] : []) ?? []);
 
@@ -85,6 +87,96 @@ test('news search then article detail produces original citations using a single
     for (const reply of replies(round.contents)) { contracts.parse('AssistantToolResult', reply, true); assert.ok(byteLength(reply) <= 8000); }
   }
   assert.ok(!JSON.stringify(testbed.captured).includes(article.url));
+});
+
+test('complete resets clear every supported filter and return a valid receipt and applied action', async () => {
+  const message = 'Reset all filters';
+  const active: Data = {
+    location_ids: article.location_ids, bounds: [-83, 35, -82, 36], themes: ['flooding'], entity_ids: ['entity-test'],
+    event_types: ['flood'], topics: ['environment'], verification_status: 'reviewed', has_location: true,
+    keyword: 'Helene', semantic_query: 'river flooding', published_from: '2024-09-01T00:00:00Z', published_to: '2024-10-01T00:00:00Z',
+  };
+  assert.deepEqual(Object.keys(active).sort(), [...filterKeys].sort());
+  for (const filters of [{}, { ...active, limit: 20, offset: 40 }]) {
+    const testbed = setup([
+      call('interpret_request', { ...intent, actions: [{ type: 'set_filters', quote: message }], filter_keys: [...filterKeys], clear_filters: [...filterKeys] }),
+      call('set_filters', { set: {}, clear: [...filterKeys] }),
+      call('respond', { kind: 'action_summary', answer: '', citations: [], result_ids: [], actions: [], clarification_reason: null }),
+    ]);
+    const result = await testbed.assistant.answer({ ...input, message, filters });
+    assert.equal(result.mode, 'fixture', JSON.stringify(result.errors));
+    assert.equal(result.kind, 'action_summary'); assert.deepEqual(result.errors, []);
+    const expected = { ...('limit' in filters ? { limit: filters.limit } : {}), offset: 0 };
+    assert.deepEqual(result.actions, [{ type: 'set_filters', filters: expected }]);
+    assert.deepEqual(object(result.search).filters, expected);
+    const receipt = replies(testbed.captured.at(-1)!.contents).find(reply => reply.kind === 'receipt')!;
+    contracts.parse('AssistantToolResult', receipt, true);
+    assert.deepEqual(object(receipt.receipt).changed_keys, [...filterKeys]);
+    assert.equal(testbed.repository.calls.filter(row => row.name === 'news').length, 1);
+    assert.deepEqual(testbed.repository.calls.find(row => row.name === 'news')!.input, { limit: 50, ...expected });
+  }
+});
+
+test('keyword fallback is disclosed to research and chat for unavailable or failed embeddings, including empty results', async t => {
+  for (const failure of ['unavailable', 'failed']) for (const empty of [false, true]) {
+    await t.test(`${failure} embeddings, ${empty ? 'empty' : 'matching'} keyword results`, async () => {
+      let embeddingCalls = 0;
+      const embeddings = failure === 'failed' ? new Embeddings({ ...config, geminiKey: 'synthetic-key', embeddingModel: 'synthetic-model', embeddingVersion: 'synthetic-v1' }, {
+        models: { embedContent: async () => { embeddingCalls++; throw new Error('Private synthetic provider detail'); } },
+      }) : undefined;
+      const semantic_query = empty ? 'no-matches-for-this-test' : 'Helene';
+      const testbed = setup([
+        call('interpret_request', intent), call('search_news'),
+        call('respond', { kind: empty ? 'empty' : 'answer', answer: 'A model answer without a fallback disclosure.', citations: [], result_ids: [], actions: [], clarification_reason: null }),
+      ], config, Date.now, new Repository(), embeddings);
+      const result = await testbed.assistant.answer({ ...input, filters: { semantic_query, location_ids: [article.location_ids[0]] } });
+      assert.equal(result.mode, 'fixture', JSON.stringify(result.errors));
+      assert.equal(result.kind, empty ? 'empty' : 'answer');
+      const compact = replies(testbed.captured.at(-1)!.contents).find(reply => reply.kind === 'news')!;
+      contracts.parse('AssistantToolResult', compact, true);
+      assert.match(String(compact.limitation), /semantic search.*unavailable/i);
+      assert.match(String(compact.limitation), /literal keyword matching/i);
+      assert.equal(records(compact.items).length === 0, empty);
+      assert.ok(byteLength(compact) <= 8000);
+      const notice = records(result.errors).find(error => error.code === 'SEMANTIC_SEARCH_UNAVAILABLE')!;
+      assert.match(String(notice.message), /semantic search.*unavailable.*literal keyword matching/i);
+      assert.equal(notice.retryable, false); assert.ok(String(compact.limitation).includes(String(notice.message)));
+      if (!empty) assert.match(String(compact.limitation), /Returned-page counts are not corpus totals/);
+      assert.equal(embeddingCalls, failure === 'failed' ? 1 : 0);
+      const query = testbed.repository.calls.find(row => row.name === 'news')!.input;
+      assert.equal(query.keyword, semantic_query); assert.deepEqual(query.location_ids, [article.location_ids[0]]);
+      assert.ok(!JSON.stringify(result).includes('Private synthetic provider detail'));
+    });
+  }
+});
+
+test('semantic filter commands retain the fallback limitation in their receipt and final status', async () => {
+  const message = 'Search for river flooding';
+  const testbed = setup([
+    call('interpret_request', { ...intent, actions: [{ type: 'set_filters', quote: message }], filter_keys: ['semantic_query'] }),
+    call('set_filters', { set: { semantic_query: 'no-matches-for-this-test' }, clear: [] }),
+    call('respond', { kind: 'action_summary', answer: '', citations: [], result_ids: [], actions: [], clarification_reason: null }),
+  ]);
+  const result = await testbed.assistant.answer({ ...input, message });
+  assert.equal(result.mode, 'fixture', JSON.stringify(result.errors)); assert.equal(result.kind, 'empty');
+  assert.equal(records(result.actions).length, 1);
+  const receipt = replies(testbed.captured.at(-1)!.contents).find(reply => reply.kind === 'receipt')!;
+  assert.match(String(receipt.limitation), /semantic search.*unavailable.*literal keyword matching/i);
+  assert.deepEqual(result.errors, [{ code: 'SEMANTIC_SEARCH_UNAVAILABLE', message: receipt.limitation, retryable: false }]);
+});
+
+test('successful semantic research does not emit a keyword fallback notice', async () => {
+  const repository = new Repository(); repository.data.semantic_news = core.articles;
+  const embeddings = new Embeddings({ ...config, geminiKey: 'synthetic-key', embeddingModel: 'synthetic-model', embeddingVersion: 'synthetic-v1', embeddingDimensions: 3 }, {
+    models: { embedContent: async () => ({ embeddings: [{ values: [1, 2, 3] }] }) },
+  });
+  const testbed = setup([call('interpret_request', intent), call('search_news'), answer()], config, Date.now, repository, embeddings);
+  const result = await testbed.assistant.answer({ ...input, filters: { semantic_query: 'river flooding' } });
+  assert.equal(result.mode, 'fixture', JSON.stringify(result.errors)); assert.deepEqual(result.errors, []);
+  assert.equal(repository.calls.filter(row => row.name === 'semantic_news').length, 1);
+  assert.ok(!repository.calls.some(row => row.name === 'news'));
+  const compact = replies(testbed.captured.at(-1)!.contents).find(reply => reply.kind === 'news')!;
+  assert.doesNotMatch(String(compact.limitation), /semantic search.*unavailable/i);
 });
 
 test('identical retained tool results become small receipts instead of duplicate evidence', async () => {

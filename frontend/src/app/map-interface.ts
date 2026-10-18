@@ -3,6 +3,7 @@ import type {
   Article,
   Coverage,
   Evidence,
+  FlightRegion,
   Location,
   WindSample,
 } from "@atlas/contracts";
@@ -10,6 +11,7 @@ import type {
 export type Coordinates = NonNullable<Location["coordinates"]>;
 export type Bounds = NonNullable<Location["bounds"]>;
 export type BasemapPreference = "auto" | "map" | "satellite";
+export type FlightMode = "global" | "area" | "region";
 export type CameraCommand = { id: string } & (
   | { type: "fit_bounds"; bounds: Bounds }
   | { type: "focus_point"; coordinates: Coordinates }
@@ -33,11 +35,24 @@ export interface MapDataStatus {
   coverage: Coverage | null;
   missingLocationIds: readonly string[];
 }
+export interface FlightTrailSegment {
+  aircraftId: string;
+  coordinates: readonly Coordinates[];
+  observedFrom: string;
+  observedTo: string;
+}
 /** The integration boundary. Map internals do not import the store or fetch data. */
 export interface AtlasMapProps {
   overlayInsets?: { top: number; right: number; bottom: number; left: number };
   evidenceOverlay?: { evidence: Evidence; url: string; opacity: number } | null;
   aircraft?: readonly AircraftState[];
+  flightsEnabled?: boolean;
+  flightMode?: FlightMode;
+  flightCoverage?: FlightRegion | null;
+  flightCoverageOversized?: boolean;
+  flightAttribution?: string;
+  flightTrails?: readonly FlightTrailSegment[];
+  lastKnownAircraftIds?: readonly string[];
   selectedAircraftId?: string | null;
   windSamples?: readonly WindSample[];
   onSelectAircraft?: (id: string) => void;

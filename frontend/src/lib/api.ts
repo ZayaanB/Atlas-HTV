@@ -10,6 +10,9 @@ import type {
   FlightsResponse,
   WindQuery,
   WindResponse,
+  FlightAreaQuery,
+  FlightAreaResponse,
+  FlightGlobalResponse,
   Contract,
   SchemaName,
 } from "@atlas/contracts";
@@ -48,6 +51,8 @@ export interface AtlasApi {
   ) => Promise<AssistantResponseV2>;
   flights?: (regionId: string, signal: AbortSignal) => Promise<FlightsResponse>;
   wind?: (query: WindQuery, signal: AbortSignal) => Promise<WindResponse>;
+  flightArea?: (query: FlightAreaQuery, signal: AbortSignal) => Promise<FlightAreaResponse>;
+  flightGlobal?: (signal: AbortSignal) => Promise<FlightGlobalResponse>;
   news: (query: NewsQuery, signal: AbortSignal) => Promise<NewsResponse>;
   locations: (
     query: LocationsQuery,
@@ -61,10 +66,21 @@ export class ApiFailure extends Error {
     readonly status: number,
     readonly retryable: boolean,
     readonly requestId: string | null = null,
+    readonly retryAt: number | null = null,
   ) {
     super(message);
     this.name = "ApiFailure";
   }
+}
+
+/** Retry-After is either seconds from receipt or an HTTP date. */
+export function parseRetryAfter(value: string | null, now = Date.now()): number | null {
+  if (!value?.trim()) return null;
+  const input = value.trim();
+  const time = /^\d+(?:\.\d+)?$/.test(input)
+    ? now + Number(input) * 1000
+    : /^[A-Za-z]{3},/.test(input) ? Date.parse(input) : NaN;
+  return Number.isFinite(time) ? Math.max(now, time) : null;
 }
 
 /** Canonical arrays make equivalent filters share a cache key and wire format. */
@@ -120,7 +136,7 @@ export function isSearchableBounds(bounds: readonly number[]): boolean {
     s! <= n!
   );
 }
-export function serializeQuery(query: NewsQuery | LocationsQuery): string {
+export function serializeQuery(query: NewsQuery | LocationsQuery | FlightAreaQuery): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(query).sort(([a], [b]) =>
     a.localeCompare(b),
@@ -158,6 +174,8 @@ export function createHttpApi(
       body = await response.json();
     } catch {
       if (signal.aborted) throw signal.reason;
+      if (!response.ok) throw new ApiFailure(`API request failed (${response.status}).`, 'HTTP_ERROR', response.status,
+        response.status === 429 || response.status >= 500, null, parseRetryAfter(response.headers.get('Retry-After')));
       throw new ApiFailure(
         "The API returned an unreadable response.",
         "INVALID_RESPONSE",
@@ -174,6 +192,7 @@ export function createHttpApi(
           response.status,
           error.retryable,
           error.request_id,
+          parseRetryAfter(response.headers.get("Retry-After")),
         );
       } catch (error) {
         if (error instanceof ApiFailure) throw error;
@@ -182,6 +201,8 @@ export function createHttpApi(
           "HTTP_ERROR",
           response.status,
           response.status === 429 || response.status >= 500,
+          null,
+          parseRetryAfter(response.headers.get("Retry-After")),
         );
       }
     }
@@ -232,6 +253,9 @@ export function createHttpApi(
     try {
       data = await response.json();
     } catch {
+      if (signal.aborted) throw signal.reason;
+      if (!response.ok) throw new ApiFailure(`This feature is unavailable (${response.status}).`, 'HTTP_ERROR', response.status,
+        response.status === 429 || response.status >= 500, null, parseRetryAfter(response.headers.get('Retry-After')));
       throw new ApiFailure(
         "The API returned an unreadable response.",
         "INVALID_RESPONSE",
@@ -248,6 +272,7 @@ export function createHttpApi(
           response.status,
           error.retryable,
           error.request_id,
+          parseRetryAfter(response.headers.get("Retry-After")),
         );
       } catch (error) {
         if (error instanceof ApiFailure) throw error;
@@ -256,6 +281,8 @@ export function createHttpApi(
           "HTTP_ERROR",
           response.status,
           response.status >= 500 || response.status === 429,
+          null,
+          parseRetryAfter(response.headers.get("Retry-After")),
         );
       }
     }
@@ -334,6 +361,12 @@ export function createHttpApi(
         signal,
       ),
     wind: (query, signal) => feature("WindResponse", `wind?${new URLSearchParams({ bounds: readContract("WindQuery", query).bounds.join(",") })}`, signal),
+    flightArea: (query, signal) => feature(
+      "FlightAreaResponse",
+      `flights/area?${serializeQuery(readContract("FlightAreaQuery", query))}`,
+      signal,
+    ),
+    flightGlobal: signal => feature("FlightGlobalResponse", "flights/global", signal),
     mode: "api",
     news: (query, signal) =>
       validated("NewsResponse", get("news", normalizeNewsQuery(query), signal)),

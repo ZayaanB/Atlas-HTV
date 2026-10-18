@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ComponentType,
@@ -17,9 +18,11 @@ import {
   readSaved,
   writeSaved,
 } from "../lib/features";
-import { useFlights } from "../lib/flights";
 import { useWind } from "../lib/wind";
 import { WindStatus } from "../features/map/WindStatus";
+import { resolveFlightMode, useFlightOverlay } from "../lib/flights";
+import { FlightDetails } from "../features/flights/FlightDetails";
+import { AircraftSearch } from "../features/flights/AircraftSearch";
 import { FilterBar } from "../features/feed/FilterBar";
 import { NewsFeed } from "../features/feed/NewsFeed";
 import { CoverageNotice } from "../features/feed/CoverageNotice";
@@ -103,12 +106,27 @@ export function App({
   const layersRef = useRef<HTMLDivElement>(null),
     articles = news.data?.items ?? [],
     places = locations.data ?? [];
-  const flights = useFlights(
-      api,
-      flightRegion,
-      flightsEnabled && !!catalog.data?.capabilities.flights,
-    ),
-    aircraft = flights.aircraft.find((a) => a.id === state.selectedAircraftId);
+  const flightMode = resolveFlightMode(catalog.data);
+  const areaEnabled = flightMode === 'area';
+  const legacyFlights = flightMode === 'region';
+  const flightAvailable = flightMode !== null;
+  const flightActive = flightsEnabled && flightAvailable;
+  const flights = useFlightOverlay(api, {
+    enabled: flightActive, mode: flightMode, areaEnabled, viewport,
+    region: catalog.data?.flight_regions.find(region => region.id === flightRegion) ?? null,
+    selectedId: state.selectedAircraftId,
+  });
+  useEffect(() => {
+    state.clearFlights();
+  }, [flightMode, api.mode, state.clearFlights]);
+  useEffect(() => {
+    if (!flightActive) state.clearFlights();
+  }, [flightActive, state.clearFlights]);
+  const aircraftIds = useMemo(() => new Set(flights.aircraft.map(a => a.id)), [flights.aircraft]);
+  function selectAircraft(id: string) {
+    if (flightActive && aircraftIds.has(id))
+      state.openPanel({ view: "aircraft", id });
+  }
   const wind = useWind(api, viewport, windEnabled);
   const selectedId = panel?.view === "article" ? panel.id : selection.articleId;
   const selected =
@@ -330,11 +348,15 @@ export function App({
             evidenceOverlay={overlay}
             aircraft={flights.aircraft}
             windSamples={wind.samples}
+            flightsEnabled={flightActive}
+            {...(flightMode ? { flightMode } : {})}
+            flightCoverage={flights.coverage}
+            flightCoverageOversized={flights.oversized}
+            flightAttribution={flights.sample?.attribution ?? flights.current?.attribution ?? (flightMode === 'global' ? 'AirLabs · Partial provider coverage' : 'ADSB.lol · ODbL-1.0 · Partial coverage')}
+            flightTrails={flights.trails}
+            lastKnownAircraftIds={flights.lastKnownIds}
             selectedAircraftId={state.selectedAircraftId}
-            onSelectAircraft={(id) => {
-              state.selectAircraft(id);
-              state.openPanel({ view: "aircraft", id });
-            }}
+            onSelectAircraft={selectAircraft}
             status={{
               state: error
                 ? "error"
@@ -479,43 +501,59 @@ export function App({
                 {api.wind ? "Current model estimates at 10 m. Arrows show flow direction; speeds are in km/h."
                   : "Wind data requires API mode and a running backend."}
               </p>
-              <h3>Aircraft</h3>
-              {catalog.data?.capabilities.flights &&
-              catalog.data.flight_regions.length ? (
-                <>
-                  <label>
-                    Reviewed region
-                    <select
-                      value={flightRegion}
-                      onChange={(e) => {
-                        setFlightRegion(e.target.value);
-                        state.selectAircraft(null);
-                      }}
-                    >
-                      <option value="">Choose region</option>
-                      {catalog.data.flight_regions.map((region) => (
-                        <option key={region.id} value={region.id}>
-                          {words(region.id)} · {region.radius_nm} nm
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      disabled={!flightRegion}
-                      checked={flightsEnabled}
-                      onChange={(e) => setFlightsEnabled(e.target.checked)}
-                    />
-                    Show aircraft
-                  </label>
-                </>
-              ) : (
-                <p className="muted">
-                  Aircraft coverage is not connected. No flight-provider
-                  requests are made.
-                </p>
+              <h3>{flightMode === 'global' ? 'Global airline traffic' : 'Flights'}</h3>
+              {legacyFlights && (
+                <label>
+                  Reviewed region
+                  <select value={flightRegion} onChange={e => {
+                    setFlightRegion(e.target.value);
+                    state.clearFlights();
+                  }}>
+                    <option value="">Choose region</option>
+                    {catalog.data!.flight_regions.map(region => <option key={region.id} value={region.id}>
+                      {words(region.id)} · {region.radius_nm} nm
+                    </option>)}
+                  </select>
+                </label>
               )}
+              <label className="checkbox-row flight-toggle">
+                <input type="checkbox" checked={flightActive}
+                  disabled={!flightAvailable || (legacyFlights && !flightRegion)}
+                  onChange={e => {
+                    setFlightsEnabled(e.target.checked);
+                    if (!e.target.checked) state.clearFlights();
+                  }} />
+                Flights
+              </label>
+              {!flightAvailable && <p className="muted">Flight coverage is not connected.</p>}
+              {flightActive && <div className="flight-controls">
+                <p role="status">{flights.status}</p>
+                {flightMode === 'global' && <>
+                  <p className="muted">{flights.aircraft.length.toLocaleString()} aircraft displayed · partial provider coverage</p>
+                  <p className="muted">{flights.sample?.fetched_at ? `Snapshot ${Math.max(0, Math.floor((flights.now - Date.parse(flights.sample.fetched_at)) / 1000))}s ago` : 'No successful snapshot yet.'}</p>
+                  {flights.canCheckAgain && <button disabled={flights.fetching} onClick={flights.checkAgain}>Check again</button>}
+                  {flights.paused && <p className="muted">Check again asks Atlas once. Provider pauses and the demo quota still apply.</p>}
+                </>}
+                {flights.coverage && <p className="muted">Coverage within this circle · {flights.coverage.radius_nm} nm<br />
+                  Center {flights.coverage.latitude.toFixed(1)}, {flights.coverage.longitude.toFixed(1)}
+                </p>}
+                {flights.oversized && <p className="muted">Zoom in for aircraft coverage.</p>}
+                {flights.updatingArea && <p className="muted">Positions and circle show the preceding sample.</p>}
+                {flights.sample && 'truncated' in flights.sample && flights.sample.truncated && <p className="notice">Limited sample · some aircraft were omitted.</p>}
+                {flightMode === 'global' ? <AircraftSearch aircraft={flights.aircraft} onSelect={selectAircraft} /> : <label>
+                  Select aircraft
+                  <select value={state.selectedAircraftId && flights.aircraft.some(a => a.id === state.selectedAircraftId) ? state.selectedAircraftId : ''}
+                    onChange={e => { if (e.target.value) selectAircraft(e.target.value); }}>
+                    <option value="">Choose aircraft</option>
+                    {flights.aircraft.map(a => <option key={a.id} value={a.id}>
+                      {a.callsign || a.registration || a.id}{flights.lastKnownIds.includes(a.id) ? ' · last-known position' : ''}
+                    </option>)}
+                  </select>
+                </label>}
+                <p className="legend flight-legend"><span />{flightMode === 'global' ? 'Observed positions · last 30 minutes' : 'Observed session trails'}</p>
+                <p className="muted">{flights.sample?.attribution ?? flights.current?.attribution ?? 'ADSB.lol · ODbL-1.0 · Partial coverage'}</p>
+                {flightMode === 'global' && <a href="https://airlabs.co/" target="_blank" rel="noopener noreferrer">AirLabs · Source and attribution ↗</a>}
+              </div>}
               {overlay && (
                 <p className="notice">
                   Dated evidence: {overlay.evidence.observed_from?.slice(0, 10)}
@@ -546,20 +584,10 @@ export function App({
             </div>
           )}
         {windEnabled && <WindStatus wind={wind} onOpenLayers={() => setLayers(true)} />}
-        {flightsEnabled && (
-          <button
-            className="flight-status"
-            onClick={() => {
-              setLayers(true);
-            }}
-          >
-            {flights.query.isError
-              ? "Aircraft unavailable"
-              : flights.stale
-                ? "Aircraft · stale sample"
-                : `Aircraft · ${flights.aircraft.length} received`}{" "}
-            {flights.query.data &&
-              `· ${Math.max(0, Math.floor((flights.now - Date.parse(flights.query.data.fetched_at)) / 1000))}s ago`}
+        {flightActive && (
+          <button className="flight-status" onClick={() => setLayers(true)}>
+            {flights.status}{flights.updatingArea && flights.error ? ' · Updating area' : ''}
+            {flights.sample?.fetched_at && ` · fetched ${Math.max(0, Math.floor((flights.now - Date.parse(flights.sample.fetched_at)) / 1000))}s ago`}
           </button>
         )}
         <div className="dock-area">
@@ -974,62 +1002,7 @@ export function App({
             </p>
           </section>
         )}
-        {panel?.view === "aircraft" && (
-          <section>
-            <h2>
-              {aircraft?.callsign ?? aircraft?.id ?? "Aircraft unavailable"}
-            </h2>
-            {aircraft ? (
-              <>
-                <dl className="metadata">
-                  <dt>Identifier</dt>
-                  <dd>{aircraft.id}</dd>
-                  <dt>Altitude</dt>
-                  <dd>
-                    {aircraft.altitude === null
-                      ? "Unknown"
-                      : `${aircraft.altitude.toLocaleString()} ft · barometric`}
-                  </dd>
-                  <dt>Speed</dt>
-                  <dd>
-                    {aircraft.speed === null
-                      ? "Unknown"
-                      : `${aircraft.speed} kn`}
-                  </dd>
-                  <dt>Heading</dt>
-                  <dd>
-                    {aircraft.heading === null
-                      ? "Unknown"
-                      : `${aircraft.heading}°`}
-                  </dd>
-                  <dt>Position · lon, lat</dt>
-                  <dd>{aircraft.coordinates.join(", ")}</dd>
-                  <dt>Observed</dt>
-                  <dd>{dateTime(aircraft.observed_at)}</dd>
-                  <dt>Fetched</dt>
-                  <dd>{dateTime(aircraft.fetched_at)}</dd>
-                </dl>
-                <p className="notice">
-                  {flights.stale ? "Stale sample. " : ""}Positions do not
-                  establish routes, delays, emergencies, or news impact.
-                </p>
-                <a
-                  href={aircraft.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  ADSB.lol · Original source ↗
-                </a>
-                <p className="muted">{flights.query.data?.attribution}</p>
-              </>
-            ) : (
-              <p>
-                This position is missing or expired. The investigation remains
-                selected.
-              </p>
-            )}
-          </section>
-        )}
+        {panel?.view === "aircraft" && <FlightDetails flights={flights} />}
       </Panel>
     </main>
     {!state.onboardingComplete && <AudienceOnboarding />}

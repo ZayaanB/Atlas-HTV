@@ -13,7 +13,7 @@ import { clarification, mergeFilterPatch, permissions } from './policy.js';
 import { modelParameters } from './schema.js';
 import { modelFailure } from './errors.js';
 import { Tools } from './tools.js';
-import { ResearchTools, type ResearchPage } from './research.js';
+import { keywordFallbackLimitation, ResearchTools, type ResearchPage } from './research.js';
 import { PromptBudget, compactParameters, compactRequest, byteLength, type ResearchBlock } from './budget.js';
 
 // Names only: Person 1 supplies the sole authoritative schemas in contracts/.
@@ -47,6 +47,7 @@ export class CoreAssistant {
   private locationChoices: string[] = [];
   private calls = 1;
   private searched: { query: Data; result: Data } | null = null;
+  private keywordFallback = false;
   private research: ResearchTools;
   private budget: PromptBudget;
   private blocks: ResearchBlock[] = [];
@@ -162,6 +163,7 @@ export class CoreAssistant {
   }
   private async queryNews(query: Data, signal: AbortSignal) {
     const result = await this.cached('news', query, () => this.retrieval.news(query, signal));
+    this.keywordFallback ||= result.search_mode === 'keyword_fallback';
     records(result.items).forEach(article => this.articles.set(string(article.id), article));
     return result;
   }
@@ -175,6 +177,7 @@ export class CoreAssistant {
     // The existing validated dispatcher is the authority for filter conflicts.
     const scoped = new Tools(this.contracts, this.retrieval, undefined, this.filters, false);
     const result = await this.cached('scoped_news', [this.filters, query], () => scoped.dispatch('search_news', query, signal));
+    this.keywordFallback ||= result.search_mode === 'keyword_fallback';
     records(result.items).forEach(row => { this.articles.set(string(row.id), row); this.searchedIds.add(string(row.id)); });
     this.searched = { query: { ...this.filters, ...query }, result };
     return result;
@@ -206,6 +209,7 @@ export class CoreAssistant {
     return { request, audience_context: audienceContext(this.input.audience), current_utc: new Date(this.clock()).toISOString(),
       resolved_range: this.resolved, authorized_actions: [...this.policy.allowed],
       state: { staged_actions: this.actions.map(action => ({ type: action.type, location_id: action.location_id, investigation_id: action.investigation_id })),
+        ...(this.keywordFallback ? { search_limitation: keywordFallbackLimitation } : {}),
         research_stopped: this.stopReason, instruction: 'Use tools for evidence; preserve active scope. Offer a timeline after comparison, but open it only when authorized. On a research limit, finish with what you found without more tool calls.' } };
   }
   private declarations(finalOnly = false): FunctionDeclaration[] {
@@ -369,7 +373,8 @@ export class CoreAssistant {
       this.filters = next; this.latest = latest; this.searched = null; this.research.scopeRevision++;
       this.searchedIds.clear(); this.discoveredInvestigations.clear();
       this.addAction({ type: 'set_filters', filters: next });
-      return this.research.receipt({ action_type: name, changed_keys: [...Object.keys(object(patch.set)), ...strings(patch.clear)] }, records(latest.items).length);
+      return this.research.receipt({ action_type: name, changed_keys: [...Object.keys(object(patch.set)), ...strings(patch.clear)] }, records(latest.items).length,
+        latest.search_mode === 'keyword_fallback' ? keywordFallbackLimitation : undefined);
     }
     if (name === 'focus_location') {
       const location = await this.retrieval.location(string(args.location_id), signal);
@@ -455,7 +460,10 @@ export class CoreAssistant {
     return this.contracts.parse('AssistantResponseV2', {
       protocol_version: 2, request_id: this.input.request_id, kind, answer, citations,
       result_ids: filtersChanged ? records(this.latest.items).map(row => row.id) : resultIds,
-      actions: this.actions, coverage: this.latest.coverage, mode: this.retrieval.repository.mode === 'fixture' ? 'fixture' : 'live', errors: this.stopReason && kind === 'answer' ? [{ code: 'RESEARCH_LIMIT_REACHED', message: 'This is a partial answer from the evidence retrieved within the research budget. Further questions can investigate the unresolved details.', retryable: false }] : [],
+      actions: this.actions, coverage: this.latest.coverage, mode: this.retrieval.repository.mode === 'fixture' ? 'fixture' : 'live', errors: [
+        ...(this.stopReason && kind === 'answer' ? [{ code: 'RESEARCH_LIMIT_REACHED', message: 'This is a partial answer from the evidence retrieved within the research budget. Further questions can investigate the unresolved details.', retryable: false }] : []),
+        ...(this.keywordFallback ? [{ code: 'SEMANTIC_SEARCH_UNAVAILABLE', message: keywordFallbackLimitation, retryable: false }] : []),
+      ],
       search: search ? { filters: search.query, returned_count: records(search.result.items).length, ...page(search.query) } : null,
       resolved_range: this.resolved, timeline: this.suggestion
     }, true);

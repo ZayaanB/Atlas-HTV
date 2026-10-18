@@ -719,6 +719,21 @@ it('replaces an abandoned research preview when the server starts its final part
   expect(screen.queryByText('Abandoned research preview')).not.toBeInTheDocument();
 });
 
+it.each(['answer', 'empty'])('shows the semantic keyword-fallback notice on a completed %s response', async kind => {
+  const stream = streamingApi(); mount(stream.api); await send('Find reporting about river flooding');
+  const message = 'Semantic search was unavailable; literal keyword matching was used and may miss relevant reporting.';
+  act(() => {
+    stream.event({ type: 'complete', response: rawResponse(stream.request.request_id, {
+      kind, answer: kind === 'empty' ? 'No stored news matches this literal query.' : 'Matching stored reporting.',
+      citations: [], result_ids: [],
+      search: { filters: { semantic_query: 'river flooding' }, returned_count: kind === 'empty' ? 0 : 1, limit: 3, offset: 0 },
+      errors: [{ code: 'SEMANTIC_SEARCH_UNAVAILABLE', message, retryable: false }],
+    }) }); stream.close();
+  });
+  expect(await screen.findByText(`${message} (SEMANTIC_SEARCH_UNAVAILABLE)`)).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Retry question' })).not.toBeInTheDocument();
+});
+
 it.each(['interrupted', 'mismatched', 'invalid event'])('discards provisional text and all actions after a %s stream', async problem => {
   const stream = streamingApi(); mount(stream.api); await send();
   act(() => { stream.event({ type: 'answer_delta', text: 'Provisional answer [1].' }); });

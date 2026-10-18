@@ -25,12 +25,30 @@ Malformed XML, unsupported feed roots (including HTML error pages), malformed JS
 
 ## Flight regions and access
 
-Each `regions` record must validate through shared `FlightRegion`: `id`, center `latitude`, `longitude`, integer `radius_nm` 1–100. IDs are the only HTTP/model flight request selectors. These are configured geographic exploration regions, not claims of verified airports/facilities. Person 2 consumes shared `AircraftState` and region metadata; do not duplicate it in map code.
+Each `regions` record must validate through shared `FlightRegion`: `id`, center `latitude`, `longitude`, integer `radius_nm` 1–100. IDs remain the HTTP/model selectors for legacy region queries. The optional map-area endpoint accepts bounded coordinates after Person 1 supplies its shared schemas; see [area-query implementation and integration handoff](flights-area-handoff.md). These are geographic exploration circles, not claims of verified airports/facilities. Person 2 consumes shared `AircraftState` and region metadata; do not duplicate it in map code.
 
-Before setting `FLIGHTS_ENABLED=true`, verify ADSB.lol production access expectations, attribution, current acceptable polling, receiver coverage and ODbL obligations. [Their API documentation](https://api.adsb.lol/docs) requests contact for production use and identifies the data/API as ODbL. Current docs do not establish a polling entitlement; 60 seconds is this backend's default safety bound, not a provider guarantee. [Open-data reference](https://www.adsb.lol/docs/open-data/api/).
+Before setting `FLIGHTS_ENABLED=true`, verify ADSB.lol production access expectations, attribution, current acceptable polling, receiver coverage and ODbL obligations. The [published usage terms](https://raw.githubusercontent.com/adsblol/api/main/src/adsb_api/app.py) identify free access with dynamic rate limits; no fixed polling entitlement is assumed. Sixty seconds per area is this backend's target, not a provider guarantee. [Open-data reference](https://www.adsb.lol/docs/open-data/api/).
+
+Set `FLIGHTS_CONTACT` to a real contact email or HTTPS URL in private `backend/.env`.
+It is required when flights are enabled and is sent as
+`User-Agent: Atlas/0.1 (contact: VALUE)`. A live diagnostic received 403 with the
+generic Node User-Agent and 200 after adding a valid contact. Restart after changing
+the setting; existing failure backoff remains in memory until restart or expiry.
 
 The adapter uses only `/v2/point/{lat}/{lon}/{radius}` and independently rejects positions outside the selected radius. The v2 envelope epoch is milliseconds; seen_pos is seconds, as described in [readsb's v2 format](https://github.com/wiedehopf/readsb/blob/dev/README-json.md). Positions older than five minutes at import are dropped; shared cache settings additionally mark stale/hide expired positions. Invalid/missing coordinates and missing age are excluded. Units remain feet (barometric) and knots; missing values stay null. There is no aircraft route, delay, destination, emergency-status inference, global feed, trail extrapolation, or history storage.
 
-One process shares all viewers' samples. At most three active region entries by default; all regions share one provider refresh gate, so a new region can temporarily return 503 during another region's refresh window. Concurrent requests for one region coalesce. Failure applies exponential delay plus Retry-After (max one hour header; max 15-minute exponential component); cached positions remain explicitly stale until expiry. Empty samples still carry partial-coverage attribution. No requests means no polls; no background timers or paid flight services are used. Do not scale to multiple backend workers without coordinating a shared quota/cache strategy.
+One process shares all viewers' samples. At most two active region/area entries by default; all requests share a 30-second global gate and a fair due-request queue. Successful areas refresh after 60 seconds. An area unused for two minutes can be replaced. A new legacy region can temporarily return 503 with Retry-After during another area's refresh window; area responses explicitly distinguish waiting/unavailable/ready. Concurrent requests coalesce. Failure applies exponential delay plus Retry-After (max one hour header; max 15-minute exponential component); cached positions remain explicitly stale until expiry. Empty samples still carry partial-coverage attribution. No requests means no polls; no background timers or paid flight services are used. Do not scale to multiple backend workers without coordinating a shared quota/cache strategy.
 
 No provider fixtures are presented as live. A future licensed replay requires a separate shared payload/config mode; currently unavailable flight access returns a controlled error rather than fabricated/replayed positions. No OpenSky substitution is implemented.
+
+## Global airline demo update
+
+Person 3 added an optional AirLabs global snapshot/cache and private persistent
+900-attempt demo budget. The prior ADSB.lol region/area implementation remains
+compatible. AirLabs is selected explicitly; provider data is not a complete world
+aircraft census, and five-minute observations do not establish complete routes.
+Shared contracts and frontend/map integration are delivered and synthetically
+verified. The authorized bounded live check also verified two shared refreshes
+with ledger delta +2; live Back/dated-evidence acceptance remains incomplete. See the updated
+[flight handoff](flights-area-handoff.md) for exact interfaces, attribution and
+validation status. No database migration, import or deployment is required.

@@ -9,7 +9,7 @@ import type {
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./AtlasMap.css";
 import { updateEvidence } from "./EvidenceLayer";
-import { updateFlights, FLIGHT_LAYERS } from "./FlightLayer";
+import { updateFlights, cancelFlightAnimation, FLIGHT_LAYERS } from "./FlightLayer";
 import { GLOBE_CENTER, homeZoom, homePadding } from "./style";
 import { installBuildings, startLocalMapPerspective, styleFor } from "./basemap";
 import { installMaterials } from "./materials";
@@ -365,6 +365,9 @@ export function AtlasMap(props: AtlasMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const propsRef = useRef(props);
+  const aircraftIds = useMemo(() => new Set(props.aircraft?.map(a => a.id)), [props.aircraft]);
+  const aircraftIdsRef = useRef(aircraftIds);
+  aircraftIdsRef.current = aircraftIds;
   const dataRef = useRef<LocationCollection>({
     type: "FeatureCollection",
     features: [],
@@ -451,6 +454,7 @@ export function AtlasMap(props: AtlasMapProps) {
       if (firstStyleLoad) {
         firstStyleLoad = false;
         setMapReady(true);
+        publishViewport();
       }
       // Reconcile a preference changed while the replacement style was loading.
       synchronizeStyle();
@@ -477,6 +481,7 @@ export function AtlasMap(props: AtlasMapProps) {
       if (nextStyle === currentStyleRef.current) return;
       currentStyleRef.current = nextStyle;
       styleReadyRef.current = false;
+      cancelFlightAnimation(map);
       map.setStyle(styleUrl(nextStyle));
     };
     const moveEnd = (event: mapboxgl.MapEvent) => {
@@ -504,9 +509,7 @@ export function AtlasMap(props: AtlasMapProps) {
       const aircraftId = rendered.find(
         (feature) =>
           typeof feature.properties?.id === "string" &&
-          (propsRef.current.aircraft ?? []).some(
-            (a) => a.id === feature.properties?.id,
-          ),
+          aircraftIdsRef.current.has(feature.properties.id),
       )?.properties?.id;
       if (typeof aircraftId === "string") {
         propsRef.current.onSelectAircraft?.(aircraftId);
@@ -594,7 +597,7 @@ export function AtlasMap(props: AtlasMapProps) {
       const current = propsRef.current;
       const inspecting = current.selection.articleId || current.selection.locationId || current.selectedAircraftId || current.evidenceOverlay;
       return styleReadyRef.current && !programmaticMotionRef.current && !current.cameraCommand &&
-        !containerRef.current?.closest('[inert]') && (!inspecting || homeRef.current);
+        !current.flightsEnabled && !containerRef.current?.closest('[inert]') && (!inspecting || homeRef.current);
     }, publishViewport);
     const canvasContainer = map.getCanvasContainer();
     canvasContainer.addEventListener("pointerdown", stopProgrammaticMotion, {
@@ -609,6 +612,7 @@ export function AtlasMap(props: AtlasMapProps) {
       stopIdleSpin();
       stopStoryPulse();
       stopLocalPerspective();
+      cancelFlightAnimation(map);
       canvasContainer.removeEventListener(
         "pointerdown",
         stopProgrammaticMotion,
@@ -644,6 +648,7 @@ export function AtlasMap(props: AtlasMapProps) {
     if (nextStyle === currentStyleRef.current) return;
     currentStyleRef.current = nextStyle;
     styleReadyRef.current = false;
+    cancelFlightAnimation(map);
     map.setStyle(styleUrl(nextStyle));
   }, [props.basemap, mapReady]);
 
@@ -736,7 +741,7 @@ export function AtlasMap(props: AtlasMapProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (map && styleReadyRef.current) updateFlights(map, props);
-  }, [mapReady, props.aircraft, props.selectedAircraftId]);
+  }, [mapReady, props.aircraft, props.selectedAircraftId, props.flightsEnabled, props.flightMode, props.flightCoverage, props.flightTrails, props.lastKnownAircraftIds]);
   useEffect(() => {
     const map = mapRef.current;
     if (map && styleReadyRef.current) updateWind(map, props.windSamples);
@@ -744,6 +749,8 @@ export function AtlasMap(props: AtlasMapProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
+    // Inspecting aircraft preserves the geographic camera, including at globe scale.
+    if (props.selectedAircraftId) return;
     if (homeRef.current) {
       map.easeTo({
         center: GLOBE_CENTER,
@@ -828,6 +835,14 @@ export function AtlasMap(props: AtlasMapProps) {
           {props.evidenceOverlay.evidence.imagery.attribution}
         </p>
       )}
+      {props.flightsEnabled && <p className="atlas-map__flight-attribution" style={{
+        bottom: (props.overlayInsets?.bottom ?? 0) + (props.overlayInsets?.bottom ? 42 : 100),
+        right: (props.overlayInsets?.right ?? 0) + 20,
+      }}>
+        {props.flightMode !== 'global' && props.flightCoverage && <>Coverage within this circle · {props.flightCoverage.radius_nm} nm<br /></>}
+        {props.flightMode !== 'global' && props.flightCoverageOversized && <>Zoom in for aircraft coverage<br /></>}
+        {props.flightMode === 'global' ? 'Observed positions · last 30 minutes' : 'Observed session trails'} · {props.flightAttribution}
+      </p>}
       {props.status.state === "empty" && (
         <p className="atlas-map__message" role="status">
           No mapped reporting on this page. Open Search to broaden the filters.
