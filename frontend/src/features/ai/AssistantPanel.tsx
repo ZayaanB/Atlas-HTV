@@ -5,6 +5,7 @@ import { useWorkspace } from "../../app/state";
 import { audienceProfiles } from "../../app/audience";
 import { AudienceSelect } from "../../components/AudienceSelect";
 import { Icon } from "../../components/Icon";
+import { GeminiMark } from "../../components/GeminiMark";
 import { dateTime } from "../../lib/presentation";
 import { ResearchCoverage } from "../research/ResearchCoverage";
 
@@ -94,8 +95,8 @@ function Sources({ citations }: { citations: CitationV2[] }) {
   const [expanded, setExpanded] = useState(false);
   if (!citations.length) return null;
   return (
-    <div className="assistant-sources">
-      <h3>Sources</h3>
+    <details className="assistant-sources">
+      <summary>Sources <span>{citations.length}</span><Icon name="chevron" size={14} /></summary>
       <ol className="plain-list">
         {citations.slice(0, expanded ? citations.length : 3).map((c) => (
           <CitationCard key={c.number} citation={c} />
@@ -112,7 +113,7 @@ function Sources({ citations }: { citations: CitationV2[] }) {
             : `Show all ${citations.length} sources`}
         </button>
       )}
-    </div>
+    </details>
   );
 }
 export function AssistantPanel({
@@ -133,43 +134,59 @@ export function AssistantPanel({
     openPanel,
   } = useWorkspace();
   const pendingTurn = session.exchanges.find(turn => turn.status === 'pending');
-  const conversation = useRef<HTMLDivElement>(null), follow = useRef(true);
+  const conversation = useRef<HTMLDivElement>(null), follow = useRef(true), input = useRef<HTMLTextAreaElement>(null), footer = useRef<HTMLDivElement>(null);
+  const [showLatest, setShowLatest] = useState(false);
   useEffect(() => {
-    const body = conversation.current?.closest('.panel-body');
-    if (!(body instanceof HTMLElement)) return;
-    const reading = () => { follow.current = body.scrollHeight - body.scrollTop - body.clientHeight < 100; };
-    body.addEventListener('scroll', reading, { passive: true });
-    return () => body.removeEventListener('scroll', reading);
+    const dismiss = (event: PointerEvent) => {
+      footer.current?.querySelectorAll<HTMLDetailsElement>('.assistant-popover[open]').forEach(menu => {
+        if (event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+      });
+    };
+    document.addEventListener('pointerdown', dismiss);
+    return () => document.removeEventListener('pointerdown', dismiss);
   }, []);
   useLayoutEffect(() => {
-    const body = conversation.current?.closest('.panel-body');
-    if (body instanceof HTMLElement && follow.current && !conversation.current?.closest('[hidden]')) body.scrollTop = body.scrollHeight;
+    const body = conversation.current;
+    if (body && !body.closest('[hidden]')) {
+      if (!session.exchanges.length) body.scrollTop = 0;
+      else if (follow.current) body.scrollTop = body.scrollHeight;
+    }
   }, [session.exchanges]);
+  useLayoutEffect(() => {
+    if (input.current) {
+      input.current.style.height = 'auto';
+      input.current.style.height = `${Math.min(input.current.scrollHeight, 144)}px`;
+    }
+  }, [session.draft]);
+  useEffect(() => {
+    if (!session.exchanges.length) { follow.current = true; setShowLatest(false); }
+  }, [session.exchanges.length]);
   const suggestions = audienceProfiles[audience].questions.map(prompt => (
     <button
       key={prompt}
       className="suggestion"
-      onClick={() => session.populatePrompt({ id: crypto.randomUUID(), text: prompt })}
+      onClick={(event) => {
+        session.populatePrompt({ id: crypto.randomUUID(), text: prompt });
+        event.currentTarget.closest('details')?.removeAttribute('open');
+        input.current?.focus();
+      }}
     >
       {prompt}<Icon name="arrow" size={15} />
     </button>
   ));
   return (
-    <section aria-label="Ask Atlas">
-      <div className="panel-tools">
-        <p className="muted assistant-context">
-          {selection.locationId
-            ? "Selected place and active filters"
-            : selectedInvestigationId
-              ? "Selected investigation and active filters"
-              : selection.articleId
-                ? "Selected article and active filters"
-                : "Current reporting and filters"}
-        </p>
+    <section aria-label="Ask Atlas" className="assistant-chat">
+      <div className="assistant-toolbar">
+        <span className="assistant-brand"><GeminiMark /> Gemini</span>
         <button className="text-button" onClick={session.newConversation}>
-          New conversation
+          <Icon name="plus" size={14} /> New conversation
         </button>
       </div>
+      <p className="assistant-context muted">
+        <Icon name="layers" size={13} />
+        {selection.locationId ? "Selected place" : selectedInvestigationId ? "Selected investigation" : selection.articleId ? "Selected article" : "Current reporting"}
+        <span>· active filters</span>
+      </p>
       {fixture && (
         <p className="notice">
           Historical fixture mode. No Gemini request is made.
@@ -181,16 +198,19 @@ export function AssistantPanel({
           research remain available.
         </p>
       )}
-      <div className="conversation" aria-label="Conversation" ref={conversation}>
+      <div className="conversation" role="region" tabIndex={0} aria-label="Conversation" ref={conversation}
+        onScroll={(event) => {
+          const body = event.currentTarget;
+          follow.current = body.scrollHeight - body.scrollTop - body.clientHeight < 100;
+          setShowLatest(!follow.current);
+        }}>
         {!session.exchanges.length && (
           <div className="assistant-empty">
-            <Icon name="spark" size={28} />
-            <h2>A closer look.</h2>
+            <GeminiMark size={32} />
+            <h2>Where should we start?</h2>
             <p className="muted">
-              Ask what the sources establish, what changed, or what remains
-              uncertain.
+              Explore a place, follow a story, or ask about the evidence.
             </p>
-            {suggestions}
           </div>
         )}
         {session.exchanges.map((turn) => (
@@ -245,30 +265,32 @@ export function AssistantPanel({
             )}
             {turn.response && (
               <article className="message assistant">
-                <span className="meta">
-                  Atlas ·{" "}
-                  {turn.response.mode === "live"
-                    ? "live generation · stored evidence"
-                    : turn.response.mode}{" "}
-                  · {turn.response.kind.replace("_", " ")}
-                </span>
+                <span className="meta">Atlas{turn.response.mode !== "live" && ` · ${turn.response.mode}`}</span>
                 <Answer response={turn.response} />
-                {turn.response.search && (
+                <details className="assistant-response-details">
+                  <summary>Response details</summary>
                   <p className="meta">
-                    {turn.response.search.returned_count} articles returned on
-                    this page · limit {turn.response.search.limit} · offset{" "}
-                    {turn.response.search.offset}
+                    {turn.response.mode === "live" ? "Live generation · stored evidence" : turn.response.mode}
+                    {" · "}{turn.response.kind.replace("_", " ")}
                   </p>
-                )}
-                {turn.response.resolved_range && (
-                  <p className="meta">
-                    {turn.response.resolved_range.target === "publication"
-                      ? "Publication"
-                      : "Observation"}{" "}
-                    period: {turn.response.resolved_range.label} ·{" "}
-                    {turn.response.resolved_range.timezone}
-                  </p>
-                )}
+                  {turn.response.search && (
+                    <p className="meta">
+                      {turn.response.search.returned_count} articles returned on
+                      this page · limit {turn.response.search.limit} · offset{" "}
+                      {turn.response.search.offset}
+                    </p>
+                  )}
+                  {turn.response.resolved_range && (
+                    <p className="meta">
+                      {turn.response.resolved_range.target === "publication"
+                        ? "Publication"
+                        : "Observation"}{" "}
+                      period: {turn.response.resolved_range.label} ·{" "}
+                      {turn.response.resolved_range.timezone}
+                    </p>
+                  )}
+                  <ResearchCoverage coverage={turn.response.coverage} />
+                </details>
                 {turn.response.timeline && (
                   <button
                     className="text-button"
@@ -306,68 +328,99 @@ export function AssistantPanel({
                   </button>
                 )}
                 <Sources citations={turn.response.citations} />
-                <ResearchCoverage coverage={turn.response.coverage} />
               </article>
             )}
           </div>
         ))}
       </div>
-      {session.exchanges.length > 0 && (
-        <details className="audience-suggestions">
-          <summary>Suggested questions</summary>
-          {suggestions}
-        </details>
-      )}
-      <p role="status" aria-atomic="true" className={pendingTurn || !session.status ? 'sr-only' : 'notice'}>
-        {pendingTurn ? phases[pendingTurn.phase ?? 'reading'] : session.status}
-      </p>
-      {filterUndo && (
-        <button className="text-button" onClick={undoFilters}>
-          Undo filters
-        </button>
-      )}
-      {session.composerError && (
-        <p role="alert" className="error">
-          {session.composerError}
+      <div className="assistant-footer" ref={footer} onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        const menu = footer.current?.querySelector<HTMLDetailsElement>('.assistant-popover[open]');
+        if (menu) {
+          event.preventDefault();
+          event.stopPropagation();
+          menu.open = false;
+          menu.querySelector('summary')?.focus();
+        }
+      }}>
+        {showLatest && <button className="assistant-latest" onClick={() => {
+          follow.current = true;
+          setShowLatest(false);
+          if (conversation.current) conversation.current.scrollTop = conversation.current.scrollHeight;
+        }}>Latest response <Icon name="chevron" size={14} /></button>}
+        <p role="status" aria-atomic="true" className={pendingTurn || !session.status ? 'sr-only' : 'assistant-status'}>
+          {pendingTurn ? phases[pendingTurn.phase ?? 'reading'] : session.status}
         </p>
-      )}
-      <form
-        className="assistant-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void session.submit();
-        }}
-      >
-        <label htmlFor="question">Your question</label>
-        <textarea
-          id="question"
-          maxLength={4000}
-          value={session.draft}
-          rows={3}
-          onChange={(e) => session.setDraft(e.target.value)}
-          placeholder="Ask about this place or story…"
-        />
-        <div className="composer-options">
-          <AudienceSelect label="Perspective" />
-        </div>
-        <p className="muted">
-          Clear filter, zoom, and timeline commands update the workspace.
-          Questions keep your current view. Conversation stays until refresh or
-          New conversation.
-        </p>
-        {session.pending ? (
-          <button type="button" onClick={() => session.cancel()}>
-            Cancel
-          </button>
-        ) : (
-          <button
-            className="primary"
-            disabled={!session.draft.trim() || !connected}
-          >
-            Send question <Icon name="arrow" size={16} />
+        {filterUndo && (
+          <button className="text-button" onClick={undoFilters}>
+            Undo filters
           </button>
         )}
-      </form>
+        {session.composerError && (
+          <p role="alert" className="error">
+            {session.composerError}
+          </p>
+        )}
+        <form
+          className="assistant-composer"
+          onSubmit={(e) => {
+            e.preventDefault();
+            follow.current = true;
+            setShowLatest(false);
+            void session.submit();
+          }}
+        >
+          <label className="sr-only" htmlFor="question">Your question</label>
+          <textarea
+            ref={input}
+            id="question"
+            maxLength={4000}
+            value={session.draft}
+            rows={2}
+            onChange={(e) => session.setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                if (!session.pending && connected && session.draft.trim()) e.currentTarget.form?.requestSubmit();
+              }
+            }}
+            placeholder="Ask about this place or story…"
+            aria-describedby="assistant-input-help"
+          />
+          <div className="composer-options">
+            <AudienceSelect label="Perspective" />
+            {session.pending ? (
+              <button type="button" className="composer-send" aria-label="Cancel" title="Stop response" onClick={() => session.cancel()}>
+                <span className="stop-symbol" />
+              </button>
+            ) : (
+              <button
+                className="primary composer-send"
+                aria-label="Send question"
+                title="Send question"
+                disabled={!session.draft.trim() || !connected}
+              >
+                <Icon name="arrow" size={18} />
+              </button>
+            )}
+          </div>
+        </form>
+        <div className="assistant-footer-tools">
+          <details className="audience-suggestions assistant-popover">
+            <summary>Suggested questions</summary>
+            <div>{suggestions}</div>
+          </details>
+          <details className="assistant-info assistant-popover">
+            <summary>Chat info</summary>
+            <div>
+              <p>Filter, zoom, and timeline commands update the workspace. Questions keep your current view.</p>
+              <p>Conversation stays until refresh or New conversation. Sources are linked when available; check the original material.</p>
+              <p>Enter to send. Shift+Enter for a new line.</p>
+            </div>
+          </details>
+        </div>
+        <span id="assistant-input-help" className="sr-only">Enter to send. Shift+Enter for a new line.</span>
+      </div>
     </section>
   );
 }

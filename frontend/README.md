@@ -28,6 +28,7 @@ For the backend, use `npm --prefix frontend run dev` and start Person 3's backen
 - One-panel Back/Close navigation, retained search drafts and scroll positions, Cmd/Ctrl+K, Escape and responsive sheet controls.
 - Investigation GET integration, known-ID access, sources/local saved IDs, paged raw timeline GET integration with units/precision/nulls, chart gaps/table alternatives, and verified dated imagery overlays.
 - Assistant v2 POST integration with intent-based commands, a retained in-memory conversation, numbered dated citations, atomic workspace actions, exact timeline navigation, coverage/fallback diagnostics, cancellation and stale-request rejection. Fixture mode never generates an AI answer.
+- Minimal Gemini-branded chat with a separately scrolling conversation, pinned composer/perspective controls, expandable sources and response details, prompt menus, and a Latest response shortcut. Enter sends; Shift+Enter adds a line. AI, News, and Search slide in from the right on opening or switching without remounting their contents; reduced-motion preferences disable the animation. On narrow screens, chat opens taller with expansion in the header and map controls stay out of the panel.
 - Bounded aircraft layer/details with heading/unknown states, timestamps, expiry, visibility-aware polling and provider backoff.
 - Persistent historical/coverage labels, missing data and recoverable error states, reduced motion and keyboard affordances.
 

@@ -87,6 +87,51 @@ it('opens the assistant directly from the AI dock button without losing drafts o
   expect(assistant).not.toHaveBeenCalled();
 });
 
+it('slides in from the right on every dock switch and reopening without remounting the chat', async () => {
+  const animate = vi.fn(() => ({ cancel: vi.fn() }));
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+  try {
+    const user = userEvent.setup();
+    mount(createFixtureApi());
+    await user.click(screen.getByRole('button', { name: 'Open assistant' }));
+    const input = screen.getByLabelText('Your question');
+    await user.type(input, 'Keep this question');
+    for (const label of ['Open news', 'Open search', 'Open assistant']) {
+      const before = animate.mock.calls.length;
+      await user.click(screen.getByRole('button', { name: label }));
+      expect(animate).toHaveBeenCalledTimes(before + 1);
+    }
+    expect(screen.getByLabelText('Your question')).toBe(input);
+    expect(input).toHaveValue('Keep this question');
+    await user.click(screen.getByRole('button', { name: 'Close panel' }));
+    const before = animate.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: 'Open assistant' }));
+    expect(animate).toHaveBeenCalledTimes(before + 1);
+    expect(animate.mock.calls.at(-1)).toEqual([
+      [{ transform: 'translateX(calc(100% + 24px))', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }],
+      { duration: 280, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    ]);
+  } finally {
+    Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+    vi.unstubAllGlobals();
+  }
+});
+
+it('respects reduced motion when opening panels', async () => {
+  const animate = vi.fn();
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: query.includes('prefers-reduced-motion'), addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+  try {
+    mount(createFixtureApi());
+    await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }));
+    expect(animate).not.toHaveBeenCalled();
+  } finally {
+    Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+    vi.unstubAllGlobals();
+  }
+});
+
 it("keeps current-page map/feed IDs together through pagination, empty pages, and filters", async () => {
   const user = userEvent.setup();
   useWorkspace.getState().applyFilters({ limit: 2 });
