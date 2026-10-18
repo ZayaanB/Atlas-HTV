@@ -8,6 +8,8 @@ import type {
   AssistantResponseV2,
   AssistantStreamEvent,
   FlightsResponse,
+  WindQuery,
+  WindResponse,
   Contract,
   SchemaName,
 } from "@atlas/contracts";
@@ -45,6 +47,7 @@ export interface AtlasApi {
     onEvent: (event: AssistantStreamEvent) => void,
   ) => Promise<AssistantResponseV2>;
   flights?: (regionId: string, signal: AbortSignal) => Promise<FlightsResponse>;
+  wind?: (query: WindQuery, signal: AbortSignal) => Promise<WindResponse>;
   news: (query: NewsQuery, signal: AbortSignal) => Promise<NewsResponse>;
   locations: (
     query: LocationsQuery,
@@ -330,6 +333,7 @@ export function createHttpApi(
         `flights?region_id=${encodeURIComponent(id)}`,
         signal,
       ),
+    wind: (query, signal) => feature("WindResponse", `wind?${new URLSearchParams({ bounds: readContract("WindQuery", query).bounds.join(",") })}`, signal),
     mode: "api",
     news: (query, signal) =>
       validated("NewsResponse", get("news", normalizeNewsQuery(query), signal)),

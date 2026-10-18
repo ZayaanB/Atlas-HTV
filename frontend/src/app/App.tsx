@@ -18,6 +18,8 @@ import {
   writeSaved,
 } from "../lib/features";
 import { useFlights } from "../lib/flights";
+import { useWind } from "../lib/wind";
+import { WindStatus } from "../features/map/WindStatus";
 import { FilterBar } from "../features/feed/FilterBar";
 import { NewsFeed } from "../features/feed/NewsFeed";
 import { CoverageNotice } from "../features/feed/CoverageNotice";
@@ -96,6 +98,7 @@ export function App({
     [overlay, setOverlay] = useState<EvidenceOverlay>(null),
     [flightRegion, setFlightRegion] = useState(""),
     [flightsEnabled, setFlightsEnabled] = useState(false),
+    [windEnabled, setWindEnabled] = useState(false),
     [insets, setInsets] = useState({ top: 0, right: 0, bottom: 0, left: 0 });
   const layersRef = useRef<HTMLDivElement>(null),
     articles = news.data?.items ?? [],
@@ -106,6 +109,7 @@ export function App({
       flightsEnabled && !!catalog.data?.capabilities.flights,
     ),
     aircraft = flights.aircraft.find((a) => a.id === state.selectedAircraftId);
+  const wind = useWind(api, viewport, windEnabled);
   const selectedId = panel?.view === "article" ? panel.id : selection.articleId;
   const selected =
     articles.find((a) => a.id === selectedId) ??
@@ -325,6 +329,7 @@ export function App({
             overlayInsets={insets}
             evidenceOverlay={overlay}
             aircraft={flights.aircraft}
+            windSamples={wind.samples}
             selectedAircraftId={state.selectedAircraftId}
             onSelectAircraft={(id) => {
               state.selectAircraft(id);
@@ -464,6 +469,16 @@ export function App({
                   ))}
                 </ul>
               </details>
+              <h3>Wind</h3>
+              <label className="checkbox-row">
+                <input type="checkbox" checked={windEnabled} disabled={!api.wind}
+                  onChange={event => setWindEnabled(event.target.checked)} />
+                Show wind
+              </label>
+              <p className="muted">
+                {api.wind ? "Current model estimates at 10 m. Arrows show flow direction; speeds are in km/h."
+                  : "Wind data requires API mode and a running backend."}
+              </p>
               <h3>Aircraft</h3>
               {catalog.data?.capabilities.flights &&
               catalog.data.flight_regions.length ? (
@@ -530,6 +545,7 @@ export function App({
               </button>
             </div>
           )}
+        {windEnabled && <WindStatus wind={wind} onOpenLayers={() => setLayers(true)} />}
         {flightsEnabled && (
           <button
             className="flight-status"

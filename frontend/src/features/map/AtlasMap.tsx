@@ -13,6 +13,7 @@ import { updateFlights, FLIGHT_LAYERS } from "./FlightLayer";
 import { GLOBE_CENTER, homeZoom, homePadding } from "./style";
 import { installBuildings, startLocalMapPerspective, styleFor } from "./basemap";
 import { installMaterials } from "./materials";
+import { updateWind } from "./WindLayer";
 import { compactMapLabel, installStoryGlow, startStoryPulse, STORY_GLOW_ID } from "./news-points";
 import { IDLE_SPIN_EVENT, startIdleGlobeSpin } from './idle-spin';
 
@@ -445,6 +446,7 @@ export function AtlasMap(props: AtlasMapProps) {
       installLocationLayers(map, dataRef.current);
       updateEvidence(map, propsRef.current.evidenceOverlay);
       updateFlights(map, propsRef.current);
+      updateWind(map, propsRef.current.windSamples);
       setMapError(null);
       if (firstStyleLoad) {
         firstStyleLoad = false;
@@ -735,6 +737,10 @@ export function AtlasMap(props: AtlasMapProps) {
     const map = mapRef.current;
     if (map && styleReadyRef.current) updateFlights(map, props);
   }, [mapReady, props.aircraft, props.selectedAircraftId]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && styleReadyRef.current) updateWind(map, props.windSamples);
+  }, [mapReady, props.windSamples]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
