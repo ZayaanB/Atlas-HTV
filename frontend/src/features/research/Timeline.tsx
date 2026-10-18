@@ -1,3 +1,5 @@
+import type { TimelineIntent } from "../../app/state";
+import { useWorkspace } from "../../app/state";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
@@ -12,33 +14,53 @@ import { ResearchCoverage } from "./ResearchCoverage";
 export function Timeline({
   api,
   data,
+  intent = null,
 }: {
   api: AtlasApi;
   data: InvestigationResponse;
+  intent?: TimelineIntent | null;
 }) {
-  const [seriesId, setSeries] = useState(data.observation_series[0]?.id ?? "");
+  const [seriesId, setSeries] = useState(
+    intent?.target.series_id ?? data.observation_series[0]?.id ?? "",
+  );
   const series = data.observation_series.find((s) => s.id === seriesId),
     [from, setFrom] = useState(""),
     [to, setTo] = useState(""),
-    [range, setRange] = useState({ from: "", to: "" }),
+    [range, setRange] = useState({
+      from: intent?.target.observed_from ?? "",
+      to: intent?.target.observed_to ?? "",
+    }),
     [error, setError] = useState(""),
     [index, setIndex] = useState(0),
     [tableLimit, setTableLimit] = useState(100);
-  const end = range.to
-    ? range.to + "T23:59:59.999Z"
-    : (series?.coverage_to ?? undefined);
-  const start = range.from
-    ? range.from + "T00:00:00.000Z"
-    : series?.coverage_from && end
+  const end =
+    range.to ||
+    (range.from && series
       ? new Date(
           Math.max(
-            Date.parse(series.coverage_from),
-            Date.parse(end) - 365 * 86400000,
+            Date.parse(range.from),
+            Math.min(
+              Date.parse(series.coverage_to),
+              Date.parse(range.from) + 365 * 86400000,
+            ),
           ),
         ).toISOString()
-      : undefined;
-  // The frozen projection guarantees one series per location + metric. Validate
-  // identity and provenance before plotting, even with an injected API adapter.
+      : series?.coverage_to);
+  const start =
+    range.from ||
+    (series && end
+      ? new Date(
+          Math.min(
+            Date.parse(end),
+            Math.max(
+              Date.parse(series.coverage_from),
+              Date.parse(end) - 365 * 86400000,
+            ),
+          ),
+        ).toISOString()
+      : undefined);
+  // Archives and current readings can share a location and metric. Validate
+  // series identity and provenance even with an injected API adapter.
   function validateRows(items: Observation[]) {
     if (
       items.some(
@@ -202,6 +224,16 @@ export function Timeline({
           setFrom("");
           setTo("");
           setIndex(0);
+          useWorkspace
+            .getState()
+            .setTimelineIntent({
+              id: crypto.randomUUID(),
+              target: {
+                investigation_id: data.investigation.id,
+                series_id: e.target.value,
+              },
+              label: null,
+            });
         }}
       >
         {data.observation_series.map((s) => (
@@ -219,6 +251,18 @@ export function Timeline({
           ? "refreshed from the provider; recent values are provisional and may be revised"
           : "historical"}
       </p>
+      <p className="notice exact-range">
+        Active range · UTC: {start ?? "Start unavailable"} –{" "}
+        {end ?? "End unavailable"}
+        {intent?.label &&
+        range.from === intent.target.observed_from &&
+        range.to === intent.target.observed_to
+          ? ` · ${intent.label.label} · ${intent.label.timezone}`
+          : ""}
+      </p>
+      <p className="muted">
+        Apply dates below to replace this range with whole UTC days.
+      </p>
       <form
         className="date-form"
         onSubmit={(e) => {
@@ -234,13 +278,38 @@ export function Timeline({
             setError("Choose an ordered period of at most 366 days.");
             return;
           }
-          if ((from || to) && (!from || !to)) {
+          if (!from || !to) {
             setError("Choose both observation dates.");
             return;
           }
+          try {
+            readContract("OpenTimelineArgs", {
+              investigation_id: data.investigation.id,
+              series_id: seriesId,
+              observed_from: from + "T00:00:00.000Z",
+              observed_to: to + "T23:59:59.999Z",
+            });
+          } catch {
+            setError("Choose valid UTC calendar dates.");
+            return;
+          }
           setError("");
-          setRange({ from, to });
+          const replacement = {
+            from: from ? from + "T00:00:00.000Z" : "",
+            to: to ? to + "T23:59:59.999Z" : "",
+          };
+          setRange(replacement);
           setIndex(0);
+          useWorkspace.getState().setTimelineIntent({
+            id: crypto.randomUUID(),
+            target: {
+              investigation_id: data.investigation.id,
+              series_id: seriesId,
+              ...(replacement.from ? { observed_from: replacement.from } : {}),
+              ...(replacement.to ? { observed_to: replacement.to } : {}),
+            },
+            label: null,
+          });
         }}
       >
         <label>
@@ -259,7 +328,7 @@ export function Timeline({
             onChange={(e) => setTo(e.target.value)}
           />
         </label>
-        <button className="text-button">Update period</button>
+        <button className="text-button">Apply UTC dates</button>
       </form>
       {error && <p role="alert">{error}</p>}
       {query.isFetching && (

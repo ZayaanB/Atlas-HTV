@@ -165,7 +165,9 @@ it("aborts an old observation range and discards its late response", async () =>
   fireEvent.change(screen.getByLabelText("Through"), {
     target: { value: earliest },
   });
-  await userEvent.click(screen.getByRole("button", { name: "Update period" }));
+  await userEvent.click(
+    screen.getByRole("button", { name: "Apply UTC dates" }),
+  );
   await screen.findByText(/Data coverage · historical fixture/);
   expect(oldSignal.aborted).toBe(true);
   const textBefore = screen.getByLabelText("Historical timeline").textContent;
@@ -238,4 +240,85 @@ it("retains explicit nulls in the observation table and never interpolates them"
     within(screen.getByRole("table")).getByText("Missing"),
   ).toBeInTheDocument();
   expect(screen.queryByRole("img")).not.toBeInTheDocument();
+});
+
+it("keeps exact DST-derived timestamps until explicit Apply replaces them with UTC days", async () => {
+  const fixture = createFixtureApi(),
+    queries: ObservationsQuery[] = [],
+    comparisons: ObservationsQuery[] = [];
+  const target = {
+    investigation_id: investigation.investigation.id,
+    series_id: series.id,
+    observed_from: "2024-11-03T04:00:00.000Z",
+    observed_to: "2024-11-04T04:59:59.999Z",
+  };
+  const api: AtlasApi = {
+    ...fixture,
+    observations: async (q, s) => {
+      queries.push(q);
+      return fixture.observations!(q, s);
+    },
+    compare: async (q, s) => {
+      comparisons.push(q);
+      return fixture.compare!(q, s);
+    },
+  };
+  mount(
+    <Timeline
+      api={api}
+      data={investigation}
+      intent={{
+        id: "dst",
+        target,
+        label: {
+          from: target.observed_from,
+          to: target.observed_to,
+          timezone: "America/Toronto",
+          label: "November 3, 2024",
+          target: "observation",
+        },
+      }}
+    />,
+  );
+  await waitFor(() => expect(queries.length).toBeGreaterThan(0));
+  expect(queries[0]).toMatchObject({
+    observed_from: target.observed_from,
+    observed_to: target.observed_to,
+  });
+  expect(comparisons[0]).toMatchObject({
+    observed_from: target.observed_from,
+    observed_to: target.observed_to,
+  });
+  expect(screen.getByText(/Active range/)).toHaveTextContent("America/Toronto");
+  const count = queries.length;
+  fireEvent.change(screen.getByLabelText("Observed from"), {
+    target: { value: "2024-09-27" },
+  });
+  expect(queries).toHaveLength(count);
+  expect(screen.getByText(/Active range/)).toHaveTextContent(
+    target.observed_from,
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Apply UTC dates" }),
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent("Choose both");
+  expect(queries).toHaveLength(count);
+  fireEvent.change(screen.getByLabelText("Through"), {
+    target: { value: "2024-09-28" },
+  });
+  await userEvent.click(
+    screen.getByRole("button", { name: "Apply UTC dates" }),
+  );
+  await waitFor(() =>
+    expect(
+      queries.some(
+        (q) =>
+          q.observed_from === "2024-09-27T00:00:00.000Z" &&
+          q.observed_to === "2024-09-28T23:59:59.999Z",
+      ),
+    ).toBe(true),
+  );
+  expect(screen.getByText(/Active range/)).not.toHaveTextContent(
+    "America/Toronto",
+  );
 });

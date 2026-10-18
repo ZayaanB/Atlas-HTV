@@ -1,5 +1,7 @@
 # Atlas backend — Person 3
 
+Assistant v2 now retrieves evidence through compact tools instead of sending full investigations upfront. See [minimal-context research, extension points and offline profiling](docs/assistant-research.md) for current behavior and budgets. Restart the backend after rebuilding the shared contracts. Earlier live results below predate this change.
+
 Implementation is authorized for this workstream. This directory now contains a runnable Node.js/TypeScript/Fastify server, canonical retrieval services, official Google Gen AI SDK orchestration/embeddings, a TLS `pg` adapter, provider adapters, manual import/indexing entrypoints, and behavioral tests. All changes are confined to `backend/`.
 
 **Current runtime (2026-10-17, main `9b592cd`):** all 24 required shared schemas and all 11 frozen database plans load. Tiger-backed health, news, locations, investigation, raw observations and endpoint comparisons pass live HTTP checks. The new optional `/api/workspace` catalog returns stored theme/entity labels and explicit article-to-investigation associations, so the frontend can discover Helene research automatically. Its SQL lives in `backend/src/data/workspace.ts` and uses the frozen `atlas-p3-v1` tables; no teammate migration or contract was changed.
@@ -128,6 +130,21 @@ The corpus currently contains the curated Helene investigation. More mapped loca
 Current news refresh results, replay provenance and timeout configuration are recorded in [news refresh status](docs/news-refresh-status.md). The browser and same-origin API both show 21 stories; that is a stored corpus, not a complete live worldwide feed.
 
 ## Gemini integration work
+
+The core assistant v2 backend consumer and Person 1 integration specification are
+in [the v2 handoff](docs/assistant-v2-handoff.md). It adds intent-authorized actions,
+bounded follow-up context, place discovery, server-resolved dates, numbered dated
+citations and optional timeline navigation. Activation requires eight new shared
+schema exports from Person 1; requests with `protocol_version:2` fail before data/
+provider work until those exports exist. Legacy requests retain their current
+schemas and authorization behavior. The v2 tests use opaque contract-port/model
+doubles for behavior; actual shared-v2 compatibility is explicitly pending.
+
+V2 interpretation counts toward the tool/round deadline. The example configuration
+now uses six rounds, still at most eight model calls/tools under the configured
+bounds; existing private settings are preserved. Dates and queries remain bounded.
+Final-draft legacy filter actions now execute canonical retrieval before returning
+result IDs. Missing observations retain their values/nulls and return a limitation.
 
 Run `AI_REQUEST_TIMEOUT_MS=60000 npm --prefix backend run verify:gemini` for the explicit live two-turn diagnostic (uses generation quota). It checks canonical news tool calling and citation resolution separately from the public assistant. The public route uses the shared `AssistantRequest`, `AssistantDraft` and `AssistantResponse`, server-resolved URLs/titles, and validated `set_filters` / `focus_location` actions only when authorized. See [Gemini integration evidence and test steps](docs/gemini-integration.md).
 

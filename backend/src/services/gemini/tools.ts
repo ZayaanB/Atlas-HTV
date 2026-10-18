@@ -3,7 +3,7 @@ import { Contracts, type Data, string } from '../validation.js';
 import { Retrieval } from '../retrieval.js';
 import type { Flights } from '../flights.js';
 export const toolSchemas = {
-  search_news: 'NewsQuery', set_filters: 'NewsQuery', focus_location: 'FocusLocationArgs',
+  search_news: 'NewsQuery', search_locations: 'LocationsQuery', set_filters: 'NewsQuery', focus_location: 'FocusLocationArgs',
   get_investigation: 'InvestigationQuery', compare_observations: 'CompareObservationsArgs',
   get_aircraft_in_region: 'FlightsQuery', find_aircraft: 'FindAircraftArgs'
 } as const;
@@ -23,6 +23,7 @@ function equivalentConstraint(key: string,left: unknown,right: unknown): boolean
 }
 export class Tools {
   readonly actions: Data[] = [];
+  latestNews?: Data;
   constructor(private contracts: Contracts, private retrieval: Retrieval, private flights?: Flights, private activeFilters: Data = {}, private allowActions = true) {}
   async action(raw: unknown, signal?: AbortSignal): Promise<Data> {
     checkAbort(signal);
@@ -50,10 +51,11 @@ export class Tools {
         }
         return this.retrieval.news({...this.activeFilters,...args},signal);
       }
+      case 'search_locations': return this.retrieval.locations(args, signal);
       case 'set_filters': {
         const action = await this.action({ type:'set_filters', filters: args },signal);
         const result = await this.retrieval.news(args,signal);
-        this.activeFilters = args; this.actions.push(action); return { action, ...result };
+        this.activeFilters = args; this.latestNews = result; this.actions.push(action); return { action, ...result };
       }
       case 'focus_location': {
         const location = await this.retrieval.location(string(args.location_id),signal);

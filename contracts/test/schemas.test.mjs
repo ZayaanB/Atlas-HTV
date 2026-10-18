@@ -542,3 +542,232 @@ test("research queries match the frozen database inputs and reject execution fie
     invalid("InvestigationResponse", missing);
   }
 });
+
+test("v2 exports are closed and v1 continues to reject v2-only context", () => {
+  const request = {
+    protocol_version: 2,
+    request_id: "r",
+    message: "Explain",
+    timezone: "UTC",
+    interaction_mode: "intent",
+    selected_article_id: knownArticle.id,
+    selected_location_id: city.id,
+    selected_bounds: [-83, 35, -82, 36],
+    history: [
+      { role: "user", content: "Previous question" },
+      { role: "assistant", content: "Previous answer" },
+    ],
+  };
+  valid("AssistantRequestV2", request);
+  for (const change of [
+    { allow_ui_actions: true },
+    { protocol_version: 1 },
+    { interaction_mode: "write" },
+    { selected_series_id: "unagreed" },
+    { history: Array(13).fill(request.history[0]) },
+    { history: [{ role: "tool", content: "untrusted" }] },
+    { history: [{ role: "user", content: "x".repeat(4001) }] },
+    { message: " " },
+    { selected_bounds: [181, 0, 0, 1] },
+  ])
+    invalid("AssistantRequestV2", { ...request, ...change });
+  for (const change of [
+    { protocol_version: 2 },
+    { selected_article_id: knownArticle.id },
+    { selected_location_id: city.id },
+    { history: [] },
+  ])
+    invalid("AssistantRequest", {
+      request_id: "r",
+      message: "Explain",
+      timezone: "UTC",
+      ...change,
+    });
+});
+test("v2 filter patches and intent keep model authorizations distinct from complete browser actions", () => {
+  valid("AssistantFilterPatch", {
+    set: { keyword: "flood" },
+    clear: ["themes"],
+  });
+  valid("AssistantFilterPatch", {
+    set: { event_types: ["flood"], topics: ["health"], verification_status: "reviewed", has_location: false },
+    clear: [],
+  });
+  valid("AssistantFilterPatch", { set: {}, clear: ["event_types", "topics", "verification_status", "has_location"] });
+  for (const set of [
+    { keyword: "" },
+    { keyword: " " },
+    { themes: [] },
+    { event_types: [] },
+    { topics: [] },
+    { location_ids: null },
+    { limit: 20 },
+    { offset: 0 },
+    { sql: "select" },
+  ])
+    invalid("AssistantFilterPatch", { set, clear: [] });
+  invalid("AssistantFilterPatch", {
+    set: { themes: ["flooding"] },
+    clear: ["themes"],
+  });
+  invalid("AssistantFilterPatch", { set: {}, clear: ["keyword", "keyword"] });
+  invalid("AssistantFilterPatch", { set: { has_location: false }, clear: ["has_location"] });
+  invalid("UIActionV2", { type: "set_filters", set: {}, clear: [] });
+  valid("UIActionV2", {
+    type: "set_filters",
+    filters: { themes: ["flooding"], limit: 20 },
+  });
+  invalid("UIActionV2", { type: "open_url", url: knownArticle.url });
+  const intent = {
+    actions: [],
+    filter_keys: [],
+    clear_filters: [],
+    clarification_reason: null,
+    use_current_area: false,
+    date_expression: null,
+    date_target: null,
+  };
+  valid("AssistantIntent", intent);
+  invalid("AssistantIntent", { ...intent, date_expression: "today" });
+  invalid("AssistantIntent", { ...intent, date_target: "publication" });
+  invalid("AssistantIntent", { ...intent, clear_filters: ["themes"] });
+  valid("AssistantIntent", {
+    ...intent,
+    filter_keys: ["themes"],
+    clear_filters: ["themes"],
+    date_expression: "today",
+    date_target: "publication",
+  });
+});
+test("v2 draft restrictions do not reject public server-derived page IDs or uncited fallbacks", () => {
+  const status = {
+    kind: "action_summary",
+    answer: "",
+    citations: [],
+    result_ids: [],
+    actions: [{ type: "set_filters", set: { keyword: "flooding" }, clear: [] }],
+    clarification_reason: null,
+  };
+  valid("AssistantDraftV2", status);
+  invalid("AssistantDraftV2", { ...status, result_ids: [knownArticle.id] });
+  invalid("AssistantDraftV2", {
+    ...status,
+    actions: [{ type: "set_filters", filters: {} }],
+  });
+  invalid("AssistantDraftV2", { ...status, kind: "clarification" });
+  const response = {
+    protocol_version: 2,
+    request_id: "r",
+    kind: "action_summary",
+    answer: "Updated filters.",
+    citations: [],
+    result_ids: [knownArticle.id],
+    actions: [],
+    coverage: { mode: "stored", live: false },
+    mode: "live",
+    errors: [],
+    search: { filters: {}, returned_count: 1, limit: 20, offset: 0 },
+    resolved_range: null,
+    timeline: null,
+  };
+  valid("AssistantResponseV2", response);
+  valid("AssistantResponseV2", {
+    ...response,
+    kind: "answer",
+    mode: "fallback",
+    result_ids: [],
+    search: null,
+  });
+  invalid("AssistantResponseV2", {
+    ...response,
+    kind: "answer",
+    mode: "fallback",
+  });
+  const citation = {
+    ...examples.citations[0],
+    number: 1,
+    published_at: null,
+    published_date: "2024-09-27",
+    observed_at: null,
+    observed_from: null,
+    observed_to: null,
+    period_start: null,
+    period_end: null,
+  };
+  valid("CitationV2", citation);
+  invalid("CitationV2", {
+    ...citation,
+    url: "https://user:secret@example.invalid/",
+  });
+  invalid("CitationV2", { ...citation, published_date: "2024-02-30" });
+  invalid("OpenTimelineArgs", {
+    investigation_id: "inv-test",
+    series_id: "series-test",
+    observed_from: "2024-09-01T00:00:00-04:00",
+  });
+  valid("OpenTimelineArgs", {
+    investigation_id: "inv-test",
+    series_id: "series-test",
+    observed_from: "2024-09-01T04:00:00.000Z",
+  });
+});
+
+test("stream events are closed, bounded and use the authoritative v2 terminal response", () => {
+  valid("AssistantStreamEvent", { type: "status", request_id: "s", phase: "reading" });
+  valid("AssistantStreamEvent", { type: "answer_delta", request_id: "s", text: "Quoted <script> text 🚀" });
+  valid("AssistantStreamEvent", { type: "error", request_id: "s", error: { code: "STREAM_INTERRUPTED", message: "Retry", retryable: true, request_id: "s" } });
+  for (const value of [
+    { type: "status", request_id: "s", phase: "invented" },
+    { type: "answer_delta", request_id: "s", text: "" },
+    { type: "answer_delta", request_id: "s", text: "a".repeat(16001) },
+    { type: "answer_delta", request_id: "s", text: "Preview", actions: [] },
+    { type: "complete", request_id: "s", response: {} },
+    { type: "tool_call", request_id: "s", args: {} },
+  ]) invalid("AssistantStreamEvent", value);
+});
+
+test("research tools have strict bounded arguments without changing manual query limits", () => {
+  valid("AssistantNewsSearchArgs", { limit: 5, offset: 10, themes: ["flooding"] });
+  valid("NewsQuery", { limit: 100 });
+  valid("AssistantLocationsSearchArgs", { ids: [city.id], limit: 5 });
+  valid("AssistantArticleReadArgs", { id: knownArticle.id, excerpt_offset: 240, excerpt_limit: 2000 });
+  valid("AssistantInvestigationReadArgs", { id: "inv-test", section: "items", limit: 5, offset: 5 });
+  valid("AssistantCatalogSearchArgs", { kind: "investigations", query: "flood", limit: 3 });
+  valid("AssistantSourcesReadArgs", { ids: [knownArticle.source_id] });
+  valid("AssistantHistoryReadArgs", { offset: 5, limit: 2 });
+  for (const [name, value] of [
+    ["AssistantNewsSearchArgs", { limit: 6 }],
+    ["AssistantNewsSearchArgs", { limit: "3" }],
+    ["AssistantNewsSearchArgs", { sql: "SELECT *" }],
+    ["AssistantLocationsSearchArgs", { limit: 100 }],
+    ["AssistantArticleReadArgs", { id: knownArticle.id, url: "https://example.invalid" }],
+    ["AssistantArticleReadArgs", { id: knownArticle.id, excerpt_limit: 2001 }],
+    ["AssistantInvestigationReadArgs", { id: "inv-test", section: "everything" }],
+    ["AssistantCatalogSearchArgs", { kind: "database", limit: 5 }],
+    ["AssistantSourcesReadArgs", { ids: [knownArticle.source_id, knownArticle.source_id] }],
+    ["AssistantSourcesReadArgs", { ids: Array.from({ length: 6 }, (_, i) => `src-${i}`) }],
+    ["AssistantHistoryReadArgs", { offset: 6 }],
+    ["AssistantHistoryReadArgs", { limit: 3 }],
+  ]) invalid(name, value);
+});
+
+test("compact research results preserve nullable dates and qualifiers while rejecting record dumps", () => {
+  const record = {
+    id: knownArticle.id, record_type: "article", title: knownArticle.title,
+    published_at: null, published_date: "2024-09-27", publication_time_basis: "date_only",
+    excerpt: null, geographic_precision: knownArticle.geographic_precision,
+  };
+  valid("AssistantResearchRecord", record);
+  invalid("AssistantResearchRecord", { ...record, published_date: "2024-02-30" });
+  invalid("AssistantResearchRecord", { ...record, published_at: "2024-09-27T00:00:00-04:00" });
+  invalid("AssistantResearchRecord", { ...record, url: "javascript:alert(1)" });
+  invalid("AssistantResearchRecord", { ...record, full_article: "Unexpected body" });
+  const result = { kind: "article", items: [record], returned_count: 1, truncated: false };
+  valid("AssistantToolResult", result);
+  valid("AssistantToolResult", { ...result, kind: "receipt", items: [], returned_count: 0, receipt: { action_type: "set_filters", changed_keys: ["keyword"] }, page_returned_count: 50 });
+  invalid("AssistantToolResult", { ...result, items: Array(6).fill(record) });
+  invalid("AssistantToolResult", { ...result, returned_count: 6 });
+  invalid("AssistantToolResult", { ...result, investigation: {} });
+  invalid("AssistantToolResult", { ...result, receipt: { filters: {} } });
+  invalid("AssistantToolResult", { ...result, exchanges: [{ index: 0, user: "Question", assistant: "a".repeat(4001) }] });
+});

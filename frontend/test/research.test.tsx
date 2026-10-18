@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AssistantResponse } from "@atlas/contracts";
+import type { AssistantResponseV2 } from "@atlas/contracts";
 import { App } from "../src/app/App";
 import { useWorkspace } from "../src/app/state";
 import { createQueryClient } from "../src/lib/queries";
@@ -101,7 +101,7 @@ it("changes investigation emphasis while retaining every supplied fact and the a
 it("rejects stale assistant actions after filters change", async () => {
   const user = userEvent.setup(),
     fixture = createFixtureApi();
-  let respond!: (r: AssistantResponse) => void;
+  let respond!: (r: AssistantResponseV2) => void;
   let requestId = "";
   const api: AtlasApi = {
     ...fixture,
@@ -114,7 +114,7 @@ it("rejects stale assistant actions after filters change", async () => {
     },
     assistant: vi.fn(async (request) => {
       requestId = request.request_id;
-      return new Promise<AssistantResponse>((resolve) => {
+      return new Promise<AssistantResponseV2>((resolve) => {
         respond = resolve;
       });
     }),
@@ -123,14 +123,18 @@ it("rejects stale assistant actions after filters change", async () => {
   await user.click(screen.getByRole("button", { name: "Open search" }));
   await user.click(screen.getByRole("button", { name: "Ask Atlas" }));
   await user.type(screen.getByLabelText("Your question"), "Show flood reports");
-  await user.click(screen.getByLabelText("Allow map and filter updates"));
   await user.click(screen.getByRole("button", { name: /Send question/ }));
   await waitFor(() => expect(requestId).not.toBe(""));
   act(() => useWorkspace.getState().applyFilters({ keyword: "new context" }));
   const news = await fixture.news({}, new AbortController().signal);
   await act(async () =>
     respond(
-      readContract("AssistantResponse", {
+      readContract("AssistantResponseV2", {
+        protocol_version: 2,
+        kind: "action_summary",
+        search: null,
+        resolved_range: null,
+        timeline: null,
         request_id: requestId,
         answer: "Old answer",
         citations: [],
@@ -153,26 +157,24 @@ it("rejects unsafe asset paths and fits global home zoom to the available viewpo
   ).toBeLessThan(homeZoom(1440, 900, { top: 0, right: 0, bottom: 0, left: 0 }));
 });
 
-it("rejects an unresolved citation before applying any workspace action", async () => {
+it("accepts an answer without required inline references and applies its valid filter action", async () => {
   const user = userEvent.setup(),
     fixture = createFixtureApi();
   const api: AtlasApi = {
     ...fixture,
     assistant: async (request, signal) => {
       const news = await fixture.news({}, signal);
-      return readContract("AssistantResponse", {
+      return readContract("AssistantResponseV2", {
+        protocol_version: 2,
+        kind: "answer",
+        search: null,
+        resolved_range: null,
+        timeline: null,
         request_id: request.request_id,
-        answer: "Synthetic unsupported answer",
-        citations: [
-          {
-            record_id: news.items[0]!.id,
-            source_id: news.items[0]!.source_id,
-            title: news.items[0]!.title,
-            url: "https://example.invalid/forged-source",
-          },
-        ],
+        answer: "Answer without mandatory inline references.",
+        citations: [],
         result_ids: [],
-        actions: [{ type: "set_filters", filters: { keyword: "forged" } }],
+        actions: [{ type: "set_filters", filters: { keyword: "water" } }],
         coverage: news.coverage,
         mode: "live",
         errors: [],
@@ -183,15 +185,10 @@ it("rejects an unresolved citation before applying any workspace action", async 
   await user.click(screen.getByRole("button", { name: "Open search" }));
   await user.click(screen.getByRole("button", { name: "Ask Atlas" }));
   await user.type(screen.getByLabelText("Your question"), "Explain this story");
-  await user.click(screen.getByLabelText("Allow map and filter updates"));
   await user.click(screen.getByRole("button", { name: /Send question/ }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "A citation could not be resolved",
-  );
-  expect(useWorkspace.getState().filters.keyword).toBeUndefined();
-  expect(
-    screen.queryByText("Synthetic unsupported answer"),
-  ).not.toBeInTheDocument();
+  expect(await screen.findByText("Answer without mandatory inline references.")).toBeVisible();
+  expect(useWorkspace.getState().filters.keyword).toBe("water");
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 
 afterEach(() => vi.unstubAllGlobals());

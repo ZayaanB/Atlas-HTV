@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Evidence, InvestigationResponse } from "@atlas/contracts";
 import type { AtlasApi } from "../../lib/api";
+import { useWorkspace } from "../../app/state";
 import { SourceCards } from "./SourceCards";
 import { Timeline } from "./Timeline";
 import { dateTime, words } from "../../lib/presentation";
 import { localEvidenceAsset } from "../../lib/evidence-assets";
-import {useWorkspace} from '../../app/state';
 import {audienceProfiles} from '../../app/audience';
 import {AudienceSelect} from '../../components/AudienceSelect';
 export type EvidenceOverlay = {
@@ -30,8 +30,10 @@ export function InvestigationPanel({
   onOverlay: (overlay: EvidenceOverlay) => void;
   onFocus: (bounds: NonNullable<Evidence["imagery"]>["bounds"]) => void;
 }) {
-  const [tab, setTab] = useState("brief"),
-    [sourceFocus, setSourceFocus] = useState<string | null>(null),
+  const tab = useWorkspace((s) => s.investigationTab),
+    setTab = useWorkspace((s) => s.setInvestigationTab),
+    timelineIntent = useWorkspace((s) => s.timelineIntent);
+  const [sourceFocus, setSourceFocus] = useState<string | null>(null),
     [imageId, setImageId] = useState(""),
     [visible, setVisible] = useState(false),
     [opacity, setOpacity] = useState(0.85),
@@ -87,15 +89,17 @@ export function InvestigationPanel({
         </button>
       </div>
       <nav className="section-tabs" aria-label="Investigation sections">
-        {["brief", "timeline", "evidence", "sources"].map((value) => (
-          <button
-            key={value}
-            aria-current={tab === value ? "page" : undefined}
-            onClick={() => setTab(value)}
-          >
-            {value[0]!.toUpperCase() + value.slice(1)}
-          </button>
-        ))}
+        {(["brief", "timeline", "evidence", "sources"] as const).map(
+          (value) => (
+            <button
+              key={value}
+              aria-current={tab === value ? "page" : undefined}
+              onClick={() => setTab(value)}
+            >
+              {value[0]!.toUpperCase() + value.slice(1)}
+            </button>
+          ),
+        )}
       </nav>
       {tab === "brief" && (
         <>
@@ -138,7 +142,18 @@ export function InvestigationPanel({
           ))}
         </>
       )}
-      {tab === "timeline" && <Timeline api={api} data={data} />}
+      {tab === "timeline" && (
+        <Timeline
+          key={timelineIntent?.id ?? inv.id}
+          api={api}
+          data={data}
+          intent={
+            timelineIntent?.target.investigation_id === inv.id
+              ? timelineIntent
+              : null
+          }
+        />
+      )}
       {tab === "sources" && (
         <SourceCards sources={data.sources} focusId={sourceFocus} />
       )}

@@ -17,6 +17,20 @@ export function matchesNews(article: Data, query: Data): boolean {
 }
 export class Retrieval {
   constructor(readonly contracts: Contracts, readonly repository: Repository, private embeddings?: Embeddings) {}
+  async article(id: string, signal?: AbortSignal): Promise<Data> {
+    // InvestigationQuery already supplies the canonical single-record ID shape.
+    const query = this.contracts.parse('InvestigationQuery', { id });
+    const [row] = await this.repository.read('article', query, signal);
+    if (!row) throw new AppError('NOT_FOUND', 'Article not found', 404);
+    const article = this.contracts.parse('Article', row, true);
+    if (article.id !== id) throw new AppError('INVALID_UPSTREAM_DATA', 'Article lookup returned a different record', 502);
+    checkAbort(signal);
+    return article;
+  }
+  async catalog(signal?: AbortSignal): Promise<Data> {
+    return this.workspace({ investigations: true, observations: true, assistant: true,
+      assistant_context: true, flights: false, series_filter: false }, [], signal);
+  }
   async workspace(capabilities: Data, regions: Data[], signal?: AbortSignal): Promise<Data> {
     const [catalog] = await this.repository.read('workspace', {}, signal);
     if (!catalog) throw new AppError('DATA_UNAVAILABLE', 'Workspace catalog is unavailable', 503, true);
@@ -116,8 +130,10 @@ export class Retrieval {
     const result = await this.observations(query, signal), items = records(result.items);
     const first = items[0], last = items.at(-1);
     if (!first || !last || first.id === last.id) return { ...result, comparison: null, limitation: 'Two observations are required' };
-    if (items.some(r => r.unit !== first.unit || r.metric !== first.metric || r.location_id !== first.location_id || r.source_id !== first.source_id || !Number.isFinite(r.value)))
+    if (items.some(r => r.unit !== first.unit || r.metric !== first.metric || r.location_id !== first.location_id || r.source_id !== first.source_id))
       throw new AppError('INCOMPARABLE_OBSERVATIONS', 'Comparison requires one location, metric, source, unit, and numeric values');
+    if (items.some(r => !Number.isFinite(r.value)))
+      return { ...result, comparison: null, limitation: 'Returned observations include missing values; narrow the period to compare numeric endpoints. Gaps are not interpolated.' };
     // Never describe a capped result as the entire requested range.
     return { ...result, comparison: { first_id: first.id, last_id: last.id, difference: Number(last.value)-Number(first.value), unit: first.unit }, limitation: 'Difference between returned endpoints; capped raw observations, no causal inference' };
   }

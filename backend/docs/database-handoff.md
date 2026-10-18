@@ -42,6 +42,11 @@ Write batches use one checked-out client and BEGIN/COMMIT/ROLLBACK, max 1000 row
 
 ## Schema details Person 4 must freeze
 
+The core assistant also has an optional backend-owned `article` read against the
+already frozen `atlas.article_records` projection, with bound `id` and `LIMIT 1`.
+Like the optional workspace catalog, it has a local fallback query plan and is not
+a core readiness requirement. It adds no database schema, import, or write path.
+
 Supply exact qualified table/view/column names, join keys, JSON/array/null conventions, unique canonical-URL/source IDs, timestamp types and UTC encoding, observation primary key and series identity, extension availability, permissions and migration version. Supply one verified investigation with linked original sources, known geographic precision, actual observation values/units/periods, coverage/license/attribution, and source refresh metadata. Do not supply credentials in Git.
 
 For TimescaleDB: define the real hypertable, a justified continuous aggregate, bucket timezone/period/units/count/missing-data semantics, refresh policy and an example expected series. A later agreed bucket schema/route will consume that aggregate; current raw timeline code does not claim it.

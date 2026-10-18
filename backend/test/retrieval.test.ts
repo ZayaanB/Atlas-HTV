@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Retrieval, matchesNews } from '../src/services/retrieval.js';
 import { Tools } from '../src/services/gemini/tools.js';
+import { timelineTarget } from '../src/services/gemini/context.js';
 import { bounds, range, normalizeQuery } from '../src/services/validation.js';
 import { protocolArticle, testContracts, TestRepository } from './support.js';
 import type { Read } from '../src/data/queries.js';
@@ -86,4 +87,27 @@ test('series_id selects one of two series sharing a location and metric, in the 
   assert.deepEqual(result.comparison,{first_id:'l1',last_id:'l2',difference:2,unit:'test-unit'});
   // Without series_id the two sources mix, and comparison refuses rather than diffing across them.
   await assert.rejects(retrieval.compare({location_id:'test-place',metric:'test-metric'}),/one location/);
+});
+
+test('missing observation values retain rows and provide a comparison limitation', async () => {
+  const rows = [1, 2].map(n => ({ id: `test-${n}`, location_id: 'test-place', metric: 'test-metric', unit: 'test-unit',
+    source_id: 'test-source', value: n === 1 ? null : 5, observed_at: `2026-01-0${n}T00:00:00Z` }));
+  const retrieval = new Retrieval(testContracts(), new TestRepository({ observations: rows }));
+  const result = await retrieval.compare({ location_id: 'test-place', metric: 'test-metric' });
+  assert.equal(result.comparison, null);
+  assert.deepEqual(result.items, rows);
+  assert.match(String(result.limitation), /missing values/);
+});
+
+test('assistant timeline targets isolate archives and live series sharing a location and metric', async () => {
+  const series = (id: string) => ({ id, location_id: 'test-place', metric: 'test-metric', source_id: 'test-source', unit: 'test-unit' });
+  const repository = new TestRepository({
+    investigation: [{ investigation: { id: 'test-investigation' }, observation_series: [series('test-archive'), series('test-live')] }],
+    observations: ['test-archive', 'test-live'].flatMap(series_id => [1, 2].map(n => ({
+      ...series(series_id), id: `${series_id}-${n}`, series_id, value: n, observed_at: `2026-01-0${n}T00:00:00Z`,
+    }))),
+  });
+  const target = { investigation_id: 'test-investigation', series_id: 'test-live' };
+  assert.deepEqual(await timelineTarget(target, new Retrieval(testContracts(), repository)), target);
+  assert.equal(repository.calls.find(call => call.name === 'observations')!.input.series_id, 'test-live');
 });

@@ -145,7 +145,12 @@ export function createFixtureApi(): AtlasApi {
     },
     async assistant(request, signal) {
       signal.throwIfAborted();
-      return readContract("AssistantResponse", {
+      return readContract("AssistantResponseV2", {
+        protocol_version: 2,
+        kind: "answer",
+        search: null,
+        resolved_range: null,
+        timeline: null,
         request_id: request.request_id,
         answer:
           "Assistant explanation unavailable in historical fixture mode. Explore the source-linked investigation and manual filters; no AI explanation has been generated.",

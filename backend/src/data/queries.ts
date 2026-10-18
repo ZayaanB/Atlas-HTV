@@ -3,7 +3,8 @@ import { AppError, checkAbort, unavailable } from '../runtime/errors.js';
 import type { Data, NewsFiltering } from '../services/validation.js';
 import { filterNewsPlan } from './news-filters.js';
 import { workspacePlan } from './workspace.js';
-export const reads = ['news', 'locations', 'investigation', 'observations', 'sources', 'semantic_news', 'freshness', 'embedding_chunks', 'workspace'] as const;
+import { articlePlan } from './article.js';
+export const reads = ['news', 'locations', 'investigation', 'observations', 'sources', 'semantic_news', 'freshness', 'embedding_chunks', 'workspace', 'article'] as const;
 export type Read = typeof reads[number];
 export const corePlans: Read[] = ['news','locations','investigation','observations','sources','freshness'];
 // Reviewed write plans. Live ingestion (migration 006) adds event locations and live observation series.
@@ -42,7 +43,7 @@ export class PgRepository implements Repository {
   }
   get missingPlans() { return corePlans.filter(name => !Object.hasOwn(this.handoff.plans,name)); }
   private plan(name: keyof DatabaseHandoff['plans'], input: Data) {
-    const plan = this.handoff.plans[name] ?? (name === 'workspace' ? workspacePlan : undefined);
+    const plan = this.handoff.plans[name] ?? (name === 'workspace' ? workspacePlan : name === 'article' ? articlePlan : undefined);
     if (!plan) throw unavailable('SCHEMA_HANDOFF_UNAVAILABLE', `Database query ${name} awaits the frozen schema handoff`);
     const query = { text: plan.text, values: plan.parameters.map(key => input[key] ?? null) };
     return name === 'news' || name === 'semantic_news' ? filterNewsPlan(query,input,this.newsFiltering) : query;

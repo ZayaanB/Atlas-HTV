@@ -37,7 +37,8 @@ export async function buildApp(config: Config, injected?: Services) {
       if (reply.sent || reply.raw.destroyed) return;
       const error=new AppError('REQUEST_TIMEOUT','Request processing timed out',503,true);
       controller.abort(error);
-      reply.send(error);
+      if (reply.raw.headersSent) reply.raw.destroy();
+      else reply.send(error);
     },config.requestTimeoutMs).unref();
     const cleanup=()=>{
       clearTimeout(deadline);controllers.delete(controller);
@@ -59,6 +60,9 @@ export async function buildApp(config: Config, injected?: Services) {
   });
   app.setErrorHandler((error,request,reply) => {
     if (reply.sent) return;
+    // A streaming response has already committed its headers. Disconnects and
+    // deadlines terminate it; a second JSON response would corrupt the stream.
+    if (reply.raw.headersSent) { reply.raw.destroy(); return; }
     const mapped = (error as {code?:string}).code === 'FST_ERR_HANDLER_TIMEOUT'
       ? new AppError('REQUEST_TIMEOUT','Request processing timed out',503,true) : error;
     const known = mapped instanceof AppError;

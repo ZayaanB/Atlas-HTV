@@ -174,3 +174,18 @@ test('repeated final actions are deduplicated before applying the eight-action c
   const result=await assistant.answer({...input,allow_ui_actions:true});
   assert.equal(result.mode,'fixture');assert.deepEqual(result.actions,actions);
 });
+
+test('final-draft filter actions execute canonical retrieval and return the final page IDs', async () => {
+  const { assistant, repo } = setup({ generate: async () => final({ ...draft,
+    actions: [{ type: 'set_filters', filters: { keyword: 'no match' } }] }) });
+  const result = await assistant.answer({ ...input, allow_ui_actions: true });
+  assert.equal(result.mode, 'fixture');
+  assert.deepEqual(result.result_ids, []);
+  assert.ok(repo.calls.some(call => call.name === 'news' && call.input.keyword === 'no match'));
+});
+
+test('location lookup is allowlisted and uses the same manual retrieval', async () => {
+  const { contracts, retrieval } = setup();
+  const tools = new Tools(contracts, retrieval, undefined, {}, false);
+  assert.deepEqual(await tools.dispatch('search_locations', { query: 'Synthetic' }), await retrieval.locations({ query: 'Synthetic' }));
+});

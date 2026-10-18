@@ -4,8 +4,9 @@ import type {
   ObservationsQuery,
   CompareObservationsArgs,
   ObservationsResponse,
-  AssistantRequest,
-  AssistantResponse,
+  AssistantRequestV2,
+  AssistantResponseV2,
+  AssistantStreamEvent,
   FlightsResponse,
   Contract,
   SchemaName,
@@ -35,9 +36,14 @@ export interface AtlasApi {
     signal: AbortSignal,
   ) => Promise<ObservationsResponse>;
   assistant?: (
-    request: AssistantRequest,
+    request: AssistantRequestV2,
     signal: AbortSignal,
-  ) => Promise<AssistantResponse>;
+  ) => Promise<AssistantResponseV2>;
+  assistantStream?: (
+    request: AssistantRequestV2,
+    signal: AbortSignal,
+    onEvent: (event: AssistantStreamEvent) => void,
+  ) => Promise<AssistantResponseV2>;
   flights?: (regionId: string, signal: AbortSignal) => Promise<FlightsResponse>;
   news: (query: NewsQuery, signal: AbortSignal) => Promise<NewsResponse>;
   locations: (
@@ -283,11 +289,41 @@ export function createHttpApi(
       ),
     assistant: (request, signal) =>
       feature(
-        "AssistantResponse",
+        "AssistantResponseV2",
         "assistant",
         signal,
-        readContract("AssistantRequest", request),
+        readContract("AssistantRequestV2", request),
       ),
+    assistantStream: async (request, signal, onEvent) => {
+      readContract("AssistantRequestV2", request);
+      let response: Response;
+      try {
+        response = await fetcher('/api/assistant', {
+          method: 'POST', signal,
+          headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        });
+      } catch (error) {
+        if (signal.aborted) throw error;
+        throw new ApiFailure('Cannot reach the Atlas API. Check the backend connection.', 'NETWORK_ERROR', 0, true, request.request_id);
+      }
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
+        const body: unknown = await response.json().catch(() => null);
+        if (!response.ok) {
+          try {
+            const { error } = readContract('ApiError', body);
+            throw new ApiFailure(error.message, error.code, response.status, error.retryable, error.request_id);
+          } catch (error) {
+            if (error instanceof ApiFailure) throw error;
+            throw new ApiFailure(`Assistant unavailable (${response.status}).`, 'HTTP_ERROR', response.status, response.status >= 500 || response.status === 429, request.request_id);
+          }
+        }
+        // Same validated v2 protocol when an adapter returns a JSON response.
+        try { return readContract('AssistantResponseV2', body); }
+        catch { throw new ApiFailure('The response failed shared validation.', 'INVALID_RESPONSE', 502, false, request.request_id); }
+      }
+      return readAssistantStream(response, request.request_id, signal, onEvent);
+    },
     flights: (id, signal) =>
       feature(
         "FlightsResponse",
@@ -303,4 +339,58 @@ export function createHttpApi(
         get("locations", readContract("LocationsQuery", query), signal),
       ),
   };
+}
+
+async function readAssistantStream(response: Response, requestId: string, signal: AbortSignal, onEvent: (event: AssistantStreamEvent) => void): Promise<AssistantResponseV2> {
+  const interrupted = () => new ApiFailure('The answer was interrupted. Retry the question to get a complete, checked response.', 'STREAM_INTERRUPTED', 502, true, requestId);
+  const invalid = () => new ApiFailure('The assistant stream failed shared validation.', 'INVALID_RESPONSE', 502, false, requestId);
+  if (!response.body) throw interrupted();
+  const reader = response.body.getReader(), decoder = new TextDecoder('utf-8', { fatal: true });
+  let buffer = '', received = 0, previewLength = 0, final: AssistantResponseV2 | undefined;
+  const abort = () => { void reader.cancel().catch(() => {}); };
+  signal.addEventListener('abort', abort, { once: true });
+  function frame(value: string) {
+    const lines = value.split('\n').filter(line => line.startsWith('data:'));
+    if (!lines.length) return;
+    if (final) throw invalid();
+    let event: AssistantStreamEvent;
+    try { event = readContract('AssistantStreamEvent', JSON.parse(lines.map(line => line.slice(5).trimStart()).join('\n'))); }
+    catch { throw invalid(); }
+    if (event.request_id !== requestId) throw invalid();
+    if (event.type === 'error') {
+      if (event.error.request_id !== requestId) throw invalid();
+      throw new ApiFailure(event.error.message, event.error.code, 502, event.error.retryable, event.error.request_id);
+    }
+    if (event.type === 'complete') {
+      if (event.response.request_id !== requestId) throw invalid();
+      final = event.response;
+    } else {
+      if (event.type === 'answer_delta' && (previewLength += event.text.length) > 32000) throw invalid();
+      onEvent(event);
+    }
+  }
+  try {
+    while (true) {
+      if (signal.aborted) throw signal.reason;
+      const part = await reader.read();
+      if (signal.aborted) throw signal.reason;
+      if (part.done) { buffer += decoder.decode(); break; }
+      received += part.value.byteLength;
+      if (received > 1048576) throw invalid();
+      buffer += decoder.decode(part.value, { stream: true });
+      buffer = buffer.replaceAll('\r\n', '\n');
+      if (buffer.length > 262144) throw invalid();
+      let boundary: number;
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) { frame(buffer.slice(0, boundary)); buffer = buffer.slice(boundary + 2); }
+    }
+    if (buffer.trim() || !final) throw interrupted();
+    return final;
+  } catch (error) {
+    if (signal.aborted || error instanceof ApiFailure) throw error;
+    throw interrupted();
+  } finally {
+    signal.removeEventListener('abort', abort);
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }
