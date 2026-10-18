@@ -6,16 +6,22 @@ Frontend consumers use Zustand and TanStack Query. The assistant and research co
 
 ## Available contracts
 
-| Registry name / TypeScript type | Meaning |
-| --- | --- |
-| `NewsQuery` | Normalized filters for existing `GET /api/news` and the corresponding search tool. No `/api/filters` endpoint is introduced. |
-| `Article` | Stored or normalized article metadata, source identity, distinct timestamps, verified links, provider provenance, and content hash. |
-| `Location` | Sourced coordinates/bounds, geographic precision and provenance. Broad places require bounds; precise places require coordinates. |
-| `Source` | The original reporting, dataset, imagery, or government record, including publication, licensing, attribution and retrieval metadata. |
-| `Citation` | A resolved citation: `source_id`, `record_id`, original `url`, `title`. |
-| `CitationReference` | An unresolved reference: `source_id`, `record_id` only. Supporting definition, not a new endpoint. |
+| Registry name / TypeScript type | Meaning                                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `NewsQuery`                     | Normalized filters for existing `GET /api/news` and the corresponding search tool. No `/api/filters` endpoint is introduced.          |
+| `Article`                       | Stored or normalized article metadata, source identity, distinct timestamps, verified links, provider provenance, and content hash.   |
+| `Location`                      | Sourced coordinates/bounds, geographic precision and provenance. Broad places require bounds; precise places require coordinates.     |
+| `Source`                        | The original reporting, dataset, imagery, or government record, including publication, licensing, attribution and retrieval metadata. |
+| `Citation`                      | A resolved citation: `source_id`, `record_id`, original `url`, `title`.                                                               |
+| `CitationReference`             | An unresolved reference: `source_id`, `record_id` only. Supporting definition, not a new endpoint.                                    |
 
 Additional foundation contracts: `LocationsQuery`, `NewsResponse`, `LocationsResponse`, `Coverage`, and `ApiError`. Responses embed the authoritative Article/Location definitions. Coverage mirrors the existing database freshness projection, including nullable source-scope fields, per-feed state, datasets, and stored-corpus counts; it never supplies a matching-result total. Coverage always carries `mode` and `live:false`; absent freshness rows may omit other metadata. HTTP failures preserve the backend's `{error:{code,message,retryable,request_id}}` envelope.
+
+## Bounded assistant research
+
+`schemas/assistant-research.ts` adds nine closed exports and inferred types: `AssistantNewsSearchArgs`, `AssistantLocationsSearchArgs`, `AssistantArticleReadArgs`, `AssistantInvestigationReadArgs`, `AssistantCatalogSearchArgs`, `AssistantSourcesReadArgs`, `AssistantHistoryReadArgs`, `AssistantResearchRecord`, and `AssistantToolResult`. They use the same local registry/build as all other contracts; v1, manual query limits and the public v2/SSE envelopes stay intact.
+
+Research search/page arguments permit at most five records, source IDs at most five, and history reads at most two complete exchanges. Compact records exclude source URLs, full investigation bodies and geometry. Original publication/observation dates, nulls, qualifiers, precision, units and explicit truncation/paging metadata remain available. The backend separately enforces 8,000 serialized bytes per reply and a 48,000-byte assembled working prompt. Numeric/type/schema bounds are runtime validation, without coercion or unknown-field stripping. See [research behavior and extension guide](../backend/docs/assistant-research.md).
 
 ## Build and checks
 
@@ -37,29 +43,34 @@ Build outputs are ignored by Git and must be rebuilt after schema changes:
 The package exports its root module, `@atlas/contracts/schemas/Article.json` (and the other named JSON files), and `@atlas/contracts/examples/helene-api.json` / `helene-research.json`. The frontend depends on `@atlas/contracts` via `file:../contracts`; build this package first. Type inference is type-only; `json-schema-to-ts` remains a package dependency because the exported declarations reference it.
 
 ```ts
-import { schemas } from '@atlas/contracts';
-import type { Article, Contract, NewsQuery } from '@atlas/contracts';
+import { schemas } from "@atlas/contracts";
+import type { Article, Contract, NewsQuery } from "@atlas/contracts";
 
-const query: NewsQuery = { location_ids: ['loc-asheville-nc'], limit: 20 };
-type SelectedContract = Contract<'Citation'>;
+const query: NewsQuery = { location_ids: ["loc-asheville-nc"], limit: 20 };
+type SelectedContract = Contract<"Citation">;
 // schemas.Article and Article originate from the same definition.
 ```
 
 For a consumer using Ajv, register every named schema once, with `ajv-formats`, matching Person 3's existing configuration:
 
 ```ts
-import { Ajv } from 'ajv';
-import addFormats from 'ajv-formats';
-import { schemas } from '@atlas/contracts';
-import type { Article } from '@atlas/contracts';
+import { Ajv } from "ajv";
+import addFormats from "ajv-formats";
+import { schemas } from "@atlas/contracts";
+import type { Article } from "@atlas/contracts";
 
-const ajv = new Ajv({ strict: true, coerceTypes: false, removeAdditional: false });
+const ajv = new Ajv({
+  strict: true,
+  coerceTypes: false,
+  removeAdditional: false,
+});
 addFormats.default(ajv); // NodeNext/CommonJS interop, matching the existing backend.
-for (const [name, schema] of Object.entries(schemas)) ajv.addSchema(schema, name);
+for (const [name, schema] of Object.entries(schemas))
+  ajv.addSchema(schema, name);
 
 const validateArticle = ajv.compile<Article>(schemas.Article);
 function readArticle(input: unknown): Article {
-  if (!validateArticle(input)) throw new Error('Invalid article');
+  if (!validateArticle(input)) throw new Error("Invalid article");
   return input;
 }
 ```
@@ -74,7 +85,7 @@ After building, set this through the backend's existing configuration mechanism:
 ATLAS_CONTRACTS_MODULE=contracts/dist/index.js
 ```
 
-Its loader already accepts this module and registers the exported names with Ajv. There is no backend configuration edit in this delivery.
+Its loader already accepts this module and registers the exported names with Ajv. Restart the backend after building the registry. For assistant v2 use `AI_MAX_ROUNDS=6` deliberately; preserve the other entries in populated secret files.
 
 Integration checks require the backend's existing locked dependencies; installing them does not change its manifest:
 
@@ -85,13 +96,23 @@ npm --prefix contracts run test:backend
 
 These checks import the actual backend loader, query normalizer, article normalizer, and citation ledger. They also run its configuration checker with a sanitized environment and no `.env` file. They open no database connection and call no providers.
 
-**Contract readiness is complete.** All 24 schemas required by the current backend are supplied, plus supporting research and workspace definitions (31 named schemas total). Runtime readiness still depends on the frozen query handoff, database configuration and service setup. No permissive schemas were introduced to hide missing integrations.
+**Contract readiness is complete.** All 24 schemas required by the current backend are supplied, plus supporting research and workspace definitions (39 named schemas total). Runtime readiness still depends on the frozen query handoff, database configuration and service setup. No permissive schemas were introduced to hide missing integrations.
 
 Additional contracts: `Investigation`, `InvestigationResponse`, `InvestigationQuery`, `Evidence`, `ObservationSeries`, `Observation`, `ObservationsQuery`, `ObservationsResponse`, `CompareObservationsArgs`, `AssistantRequest`, `AssistantDraft`, `AssistantResponse`, `UIAction`, `FocusLocationArgs`, `FlightRegion`, `FlightsQuery`, `FlightsResponse`, `FindAircraftArgs`, `AircraftState`, and `WorkspaceResponse`.
 
 `WorkspaceResponse` remains optional catalog metadata for explicit article/investigation associations, option labels, and reviewed flight regions. Assistant and timeline access do not depend on this endpoint or its legacy context/series capability flags. Existing flight definitions are unchanged; no permissive readiness placeholders are added.
 
-### Assistant and research contract details
+### Assistant v2
+
+The eight new registry exports and inferred types are `AssistantRequestV2`, `AssistantIntent`, `AssistantFilterPatch`, `OpenTimelineArgs`, `UIActionV2`, `AssistantDraftV2`, `CitationV2`, and `AssistantResponseV2`. Their authoritative definitions are in `schemas/assistant-v2.ts`; the existing build emits ESM, declarations and named JSON artifacts. Register the complete local registry. All v1 schemas and their rejection rules remain intact.
+
+The request requires version 2 and supports selected investigation/article/location IDs, explicit bounds, audience, intent/read-only mode, and up to 12 bounded history messages. Legacy `allow_ui_actions` is rejected. The browser always sends intent. Total serialized request bytes are bounded at 65,536 by the client and backend. Model filter patches use `{set,clear}` with nonempty values and no overlapping keys; browser actions carry a complete effective query. The draft forbids citation/result-ID arrays on non-answer kinds; the public response permits server-derived page IDs on successful statuses. Fallback answers are uncited, with no actions or suggested targets.
+
+Citations retain required nullable original publication/observation/period metadata plus sequential numbering. Date-only publication remains date-only. Search summaries describe returned pages, not corpus totals. Sibling date ordering, geographic ordering, citation provenance/numbering and action authorization are validated by consumers. Model parameter projection uses Person 3's existing local-reference resolver.
+
+See [frontend v2 delivery and verification](../frontend/docs/assistant-v2.md) and [Person 3's handoff](../backend/docs/assistant-v2-handoff.md). The real backend compatibility case now executes instead of skipping.
+
+### Legacy assistant and research contract details
 
 `AssistantRequest` requires `request_id`, nonblank `message` (up to 4,000 characters) and `timezone` (up to 100 characters). Optional fields are `filters: NewsQuery`, `selected_investigation_id`, `allow_ui_actions`, and `audience: general_public | journalist | investor`. The old speculative history/selected-article fields are not accepted. An omitted `allow_ui_actions` does not authorize workspace changes; the backend validates IANA timezone names.
 
@@ -119,3 +140,9 @@ Additional contracts: `Investigation`, `InvestigationResponse`, `InvestigationQu
 - Schema `$id` values use the reserved `atlas.invalid` namespace as identifiers, never as URLs to fetch. Register the local schemas before compiling references.
 
 See [shared examples](examples/README.md) for seed provenance and regeneration. Investigation, evidence, observation and action schemas live here; consumers must not create private replacements.
+
+## Assistant stream envelope
+
+`AssistantStreamEvent` is exported alongside the eight v2 schemas and has an inferred TypeScript type of the same name. The closed discriminated union has a required `request_id` and `type`: `status` with an allowlisted phase; `answer_delta` with 1–16,000 characters of provisional text; `complete` with the existing full `AssistantResponseV2`; or `error` with the existing operational error shape. Partial events cannot carry workspace actions or source URLs. SSE framing is transport-level; input remains `AssistantRequestV2`, selected via the HTTP Accept header. The browser validates frames and final IDs, bounds aggregate bytes, and preflights actions before acceptance. Generated artifacts come from the normal build and registry. V1 and existing v2 wire validation remain unchanged apart from descriptive model guidance for the draft answer.
+
+V2 citations are optional: empty arrays, unused sources and gaps in citation numbers are accepted. The backend resolves available original source links without rewriting or rejecting answer text, and unavailable markers render as plain text. There is no per-paragraph or reference-completeness validator in either consumer. URLs/metadata retain their shared structural constraints and action validation remains separate.

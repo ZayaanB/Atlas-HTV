@@ -1,5 +1,35 @@
 import type { FastifyInstance } from 'fastify';
 import type { Services } from '../runtime/services.js';
+import { PassThrough } from 'node:stream';
+import { once } from 'node:events';
+import { AppError, checkAbort } from '../runtime/errors.js';
+import type { Data } from '../services/validation.js';
+import { requireV2Contracts } from '../services/gemini/v2.js';
 export function assistantRoutes(app: FastifyInstance, services: Services) {
-  app.post('/api/assistant', { config:{ rateLimit: {max:12,timeWindow:'1 minute'} } }, request => services.assistant.answer(request.body,request.atlasSignal));
+  app.post('/api/assistant', { bodyLimit: 65536, config:{ rateLimit: {max:12,timeWindow:'1 minute'} } }, (request, reply) => {
+    if (!request.headers.accept?.includes('text/event-stream')) return services.assistant.answer(request.body, request.atlasSignal);
+    requireV2Contracts(services.contracts);
+    if (!services.contracts.has('AssistantStreamEvent')) throw new AppError('CONTRACTS_UNAVAILABLE', 'Build streaming assistant contracts and restart the backend', 503, true);
+    const input = services.contracts.parse('AssistantRequestV2', request.body);
+    const stream = new PassThrough({ highWaterMark: 16384 });
+    const emit = async (event: Data) => {
+      checkAbort(request.atlasSignal);
+      if (stream.destroyed) throw new AppError('REQUEST_CANCELLED', 'Question cancelled', 408, true);
+      const value = services.contracts.parse('AssistantStreamEvent', { ...event, request_id: input.request_id }, true);
+      if (!stream.write(`data: ${JSON.stringify(value)}\n\n`)) await once(stream, 'drain', { signal: request.atlasSignal });
+    };
+    reply.header('Content-Type', 'text/event-stream; charset=utf-8')
+      .header('Cache-Control', 'no-cache, no-transform').header('X-Accel-Buffering', 'no');
+    void services.assistant.answer(input, request.atlasSignal, emit).then(async response => {
+      await emit({ type: 'complete', response });
+    }).catch(async error => {
+      if (request.atlasSignal.aborted || stream.destroyed) return;
+      const known = error instanceof AppError;
+      await emit({ type: 'error', error: {
+        code: known ? error.code : 'INTERNAL_ERROR', message: known ? error.message : 'Assistant stream failed',
+        retryable: known ? error.retryable : true, request_id: String(input.request_id),
+      } });
+    }).catch(() => {}).finally(() => stream.end());
+    return reply.send(stream);
+  });
 }

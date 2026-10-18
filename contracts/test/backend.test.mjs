@@ -433,3 +433,33 @@ test("backend configuration checker reports supplied contracts and remaining set
   assert.equal(report.database.credentials_configured, false);
   assert.equal(report.live_connections_verified, false);
 });
+
+test("all real v2 and bounded research schemas compile in backend registry and project locally", async () => {
+  const { modelParameters } = await import(
+    "../../backend/src/services/gemini/schema.ts"
+  );
+  const names = [
+    "AssistantRequestV2",
+    "AssistantIntent",
+    "AssistantFilterPatch",
+    "OpenTimelineArgs",
+    "UIActionV2",
+    "AssistantDraftV2",
+    "CitationV2",
+    "AssistantResponseV2",
+    "AssistantNewsSearchArgs",
+    "AssistantLocationsSearchArgs",
+    "AssistantArticleReadArgs",
+    "AssistantInvestigationReadArgs",
+    "AssistantCatalogSearchArgs",
+    "AssistantSourcesReadArgs",
+    "AssistantHistoryReadArgs",
+    "AssistantResearchRecord",
+    "AssistantToolResult",
+  ];
+  for (const name of names) {
+    assert.ok(contracts.has(name));
+    const projected = modelParameters(contracts, name);
+    assert.equal(JSON.stringify(projected).includes('"$ref"'), false);
+  }
+});

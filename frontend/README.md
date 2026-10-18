@@ -15,7 +15,7 @@ npm --prefix frontend run dev:fixture
 
 Fixture mode is explicitly labeled and works without a backend or AI credentials. It uses the committed Helene articles, source-linked investigation, dated imagery and 7,467 archived observations. The globe needs a restricted public `VITE_MAPBOX_ACCESS_TOKEN`; without it, the map has an explicit unavailable state and the reporting/research panels remain usable. No automatic fallback from API mode to fixture mode occurs.
 
-For the backend, use `npm --prefix frontend run dev` and start Person 3's backend independently on port 3001. Same-origin `/api` is proxied locally. See [research integration handoff](docs/research-handoff.md) for the existing assistant/research endpoint contracts and exact remaining service setup. Optional catalog discovery does not gate assistant or timeline access.
+For the backend, use `npm --prefix frontend run dev` and start Person 3's backend independently on port 3001. Same-origin `/api` is proxied locally. See [research integration handoff](docs/research-handoff.md) for the existing assistant/research endpoint contracts and exact remaining service setup. Optional catalog discovery does not gate assistant or timeline access. The frontend always uses v2/intent, with no protocol downgrade. See [assistant v2 delivery](docs/assistant-v2.md) for activation, limits, actions and verification.
 
 ## Implemented experience
 
@@ -27,7 +27,7 @@ For the backend, use `npm --prefix frontend run dev` and start Person 3's backen
 - News starts with compact headline rows; the chevron expands details for one article at a time. The News header's fullscreen button expands the panel; Escape restores its size before closing it.
 - One-panel Back/Close navigation, retained search drafts and scroll positions, Cmd/Ctrl+K, Escape and responsive sheet controls.
 - Investigation GET integration, known-ID access, sources/local saved IDs, paged raw timeline GET integration with units/precision/nulls, chart gaps/table alternatives, and verified dated imagery overlays.
-- Assistant POST integration with explicit action consent, validated citations, coverage/fallback diagnostics, audience emphasis, cancellation and stale-request rejection. Fixture mode never generates an AI answer.
+- Assistant v2 POST integration with intent-based commands, a retained in-memory conversation, numbered dated citations, atomic workspace actions, exact timeline navigation, coverage/fallback diagnostics, cancellation and stale-request rejection. Fixture mode never generates an AI answer.
 - Bounded aircraft layer/details with heading/unknown states, timestamps, expiry, visibility-aware polling and provider backoff.
 - Persistent historical/coverage labels, missing data and recoverable error states, reduced motion and keyboard affordances.
 

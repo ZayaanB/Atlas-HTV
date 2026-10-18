@@ -1,5 +1,7 @@
 # Gemini and research integration — 2026-10-17
 
+Current v2 context handling is documented in [Minimal-context assistant research](assistant-research.md): no initial factual dump, bounded on-demand tools, a 48 KB working ceiling and partial finalization. Upfront-context discussion and live results below describe earlier behavior/verification; they do not verify this new loop with the live provider.
+
 Main `9b592cd` supplies the authoritative research/assistant/flight schemas and frontend. This backend branch consumes those definitions directly. Core contract readiness is complete; no private domain schemas or changes to frontend, contracts, migrations, seed definitions or provider-source definitions were needed.
 
 ## Live verification
@@ -64,12 +66,12 @@ npm --prefix backend start
 npm --prefix frontend run dev
 ```
 
-At http://127.0.0.1:5173/: News → select the WBTV Asheville story → Open investigation. Timeline reads raw USGS observations; Ask about this opens the assistant with the selected investigation. Select General public, Journalist or Investor for emphasis. Permit workspace changes only when testing an intentional filtering/focus request; otherwise keep consent unchecked.
+At http://127.0.0.1:5173/: Search → Ask Atlas opens the assistant. News → select the WBTV Asheville story → Open investigation → Ask about this includes the selected investigation. Timeline reads raw USGS observations. Select General public, Journalist or Investor for emphasis. V2 always uses intent mode: explicit commands authorize the relevant workspace actions; ambiguous instructions require clarification. There is no consent checkbox.
 
 ```bash
 curl http://127.0.0.1:3001/api/assistant \
   -H 'Content-Type: application/json' \
-  -d '{"request_id":"test-helene","message":"Explain the historical water outage with original sources and state a documented limitation.","timezone":"America/Toronto","filters":{"location_ids":["loc-asheville-nc"],"limit":10},"selected_investigation_id":"inv-helene-asheville-2024","audience":"general_public","allow_ui_actions":false}'
+  -d '{"protocol_version":2,"request_id":"test-helene","message":"Explain the historical water outage with original sources and state a documented limitation.","timezone":"America/Toronto","filters":{"location_ids":["loc-asheville-nc"],"limit":10},"selected_investigation_id":"inv-helene-asheville-2024","audience":"general_public","interaction_mode":"intent"}'
 ```
 
 This consumes real generation quota. Provider failures are explicitly labeled and do not silently use fixture output. The optional diagnostic `AI_REQUEST_TIMEOUT_MS=60000 npm --prefix backend run verify:gemini` makes at most two model calls and verifies canonical search/manual parity plus citation resolution, without writing to the database.
@@ -79,3 +81,25 @@ This consumes real generation quota. Provider failures are explicitly labeled an
 99 backend tests pass, including new catalog/shared-schema, SDK output/thinking, schema-bound enforcement and socket-deadline regressions. Source/test typechecks, production build and configuration check pass. Person 1's 10 actual backend-compatibility tests and 41 frontend tests pass; frontend build passes with its existing bundle-size warning. Test providers/models are injected doubles, not evidence of live provider integration.
 
 Core handoff is no longer blocked on Person 1. Embedding generation is still unconfigured/unverified, flight activation still awaits ADSB.lol usage/polling review, and worldwide mapped coverage still needs reviewed sources and source-backed location links. Daily aggregation and deployment remain separate handoffs. No commits, pushes, provisioning or deployment were performed.
+
+## V2 generation failure diagnosis — 2026-10-17
+
+A browser `GEMINI_UNAVAILABLE` report was investigated after the frontend v2 delivery. The local configuration checker confirms the key/model are configured, the shared registry is complete, and query plans are supplied. The private environment had reverted to 20 seconds for generation, 30 seconds for the route and 64,000 context bytes. The diagnosis restored the documented bounded settings: 50 seconds for generation, 60 seconds for the route, 128,000 context bytes, six rounds, and low thinking for the configured Gemini 3.8 Flash model. Credentials and unrelated settings were preserved. Node 25 watch-mode environment reloading was verified separately with temporary synthetic values; the running development listener restarted during the changes.
+
+Both v2 interpretation and final-tool declarations serialize through the actual Google SDK. Following explicit user approval, exactly one live synthetic generation request declared all 11 v2 tools and forced `interpret_request`. Gemini accepted the declarations and returned an interpretation that passed the authoritative `AssistantIntent` validator in 7,525 ms, with one transport attempt. This confirms current key/model access and acceptance of these tool schemas. It does not establish the cause of the earlier event or verify a complete sourced multi-round answer/database integration.
+
+Error mapping now distinguishes provider HTTP 500/502/503, upstream/local timeouts and known network/DNS failures while retaining sanitized messages, retryability, and no automatic generation retries. Raw provider bodies, hostnames, prompts and keys remain excluded. An official-SDK regression verifies a stubbed 503 survives as a useful sanitized failure with exactly one transport attempt. A real-contract v2 integration regression verifies provider/network/timeout failures reach the browser as retryable fallbacks without citations, workspace actions, raw failure details or replayed generation.
+
+The fixed `temperature:0` override was removed. Google's [current troubleshooting guide](https://ai.google.dev/gemini-api/docs/troubleshooting#recitation-issue) says Gemini 3.6+ models ignore custom sampling values and will reject them in a future release; earlier Gemini 3 models should retain defaults. The configured model is Gemini 3.8 Flash. This compatibility correction alone does not establish the cause of the reported failure.
+
+Backend typechecks/build/configuration check and all 131 tests pass with zero skips; automated tests use injected models/transports. No database request, data write, migration, import, deployment or further live generation was performed for this diagnosis. In the assistant, use **Retry question** to retry the original question with a new request ID. Full sourced v2 generation remains a separate live smoke check.
+
+## V2 citation correction and streaming — 2026-10-17
+
+`INVALID_CITATION` previously also rejected an otherwise sourced answer when a heading lacked a reference or its citation array included an unused valid entry. Every supplied reference still resolves through the evidence ledger, including unused entries. The finalizer now retains references actually used, deduplicates identical source/record pairs and numbers them in first-use order while rewriting their literal `[n]` tokens. It never guesses missing references, ignores an invented source or accepts an uncited factual paragraph. Short explicit headings are exempt from paragraph checks. A rejected citation produces a labeled fallback with no actions and an available manual retry.
+
+`POST /api/assistant` retains JSON behavior and additionally accepts `Accept: text/event-stream` for v2. Each SSE `data:` frame is validated against the shared `AssistantStreamEvent` schema and includes the client request ID. Events are `status` (reading/interpreting/researching/writing/validating), `answer_delta` (provisional text), `complete` (full validated `AssistantResponseV2`) and `error` (sanitized operational error). No raw model/tool/SQL/thought data is sent. Responses disable transformation/proxy buffering, respect write backpressure, and end after one terminal event. Disconnects/deadlines abort generation; errors after committed stream headers terminate the response instead of attempting a second JSON reply.
+
+For the configured Gemini 3.8 Flash model, the official SDK's `generateContentStream` streams final structured JSON while AUTO mode permits the existing allowlisted retrieval/action tools. The final schema is projected from `AssistantDraftV2`, replacing the model-facing `respond` tool for streaming rounds. Interpretation remains a forced tool call. Google documents [streamed structured output and its combination with tools on Gemini 3/4](https://ai.google.dev/gemini-api/docs/generate-content/structured-output#streaming); that combined mode is a provider preview feature. The incremental reader exposes only the top-level answer string, buffers incomplete escapes/Unicode pairs, excludes thought text and nested/tool values, and bounds aggregate output. Completed drafts retain the same strict runtime schema, provenance, policy and action checks; partial JSON is never dispatched. There is no automatic provider retry, continuation or extra generation pass to animate an already completed answer.
+
+Verification: backend source/test typechecks and build pass; all 142 tests pass with zero skips, including four real-loopback streaming lifecycle tests and five SDK/partial-JSON regressions. Shared contracts have 24 schema tests and 11 actual backend compatibility tests; frontend has 77 passing tests and a passing production build. All new provider/database dependencies are injected. No live generation or database request was made for this change; the previous single live interpretation probe does not verify provider-backed streaming. Fresh visual review remains incomplete because browser control failed; see the frontend handoff.

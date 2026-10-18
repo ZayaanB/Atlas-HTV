@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { Location, NewsQuery } from "@atlas/contracts";
+import type {
+  AssistantResponseV2,
+  Location,
+  NewsQuery,
+  OpenTimelineArgs,
+} from "@atlas/contracts";
 import { isSearchableBounds, normalizeNewsQuery } from "../lib/api";
 import {isAudience, readAudiencePreference, writeAudiencePreference, type Audience} from './audience';
 import type {
@@ -10,7 +15,7 @@ import type {
   ViewportSnapshot,
 } from "./map-interface";
 
-type CameraIntent = CameraCommand extends infer Command
+export type CameraIntent = CameraCommand extends infer Command
   ? Command extends CameraCommand
     ? Omit<Command, "id">
     : never
@@ -29,11 +34,34 @@ export interface PanelRoute {
   view: PanelView;
   id?: string | undefined;
 }
-interface WorkspaceState {
+export type InvestigationTab = "brief" | "timeline" | "evidence" | "sources";
+export interface TimelineIntent {
+  id: string;
+  target: OpenTimelineArgs;
+  label: AssistantResponseV2["resolved_range"];
+}
+export interface PreparedWorkspaceActions {
+  filters?: NewsQuery;
+  selection: MapSelection;
+  investigationId: string | null;
+  camera?: CameraIntent;
+  timeline?: TimelineIntent;
+}
+export interface WorkspaceState {
   audience: Audience;
   onboardingComplete: boolean;
   audienceStorageAvailable: boolean;
   setAudience: (audience: Audience) => void;
+  investigationTab: InvestigationTab;
+  timelineIntent: TimelineIntent | null;
+  filterUndo: NewsQuery | null;
+  setInvestigationTab: (tab: InvestigationTab) => void;
+  setTimelineIntent: (intent: TimelineIntent) => void;
+  commitAssistant: (
+    prepared: PreparedWorkspaceActions,
+    revision: number,
+  ) => boolean;
+  undoFilters: () => void;
   panel: PanelRoute | null;
   panelHistory: PanelRoute[];
   sheetExpanded: boolean;
@@ -72,6 +100,52 @@ export function createWorkspaceStore() {
       if (!isAudience(audience)) return;
       set({audience,onboardingComplete:true,audienceStorageAvailable:writeAudiencePreference(audience)});
     },
+    investigationTab: "brief",
+    timelineIntent: null,
+    filterUndo: null,
+    setInvestigationTab: (investigationTab) => set({ investigationTab }),
+    setTimelineIntent: (timelineIntent) =>
+      set((s) => ({ timelineIntent, contextRevision: s.contextRevision + 1 })),
+    commitAssistant: (prepared, revision) => {
+      if (get().contextRevision !== revision) return false;
+      set((s) => ({
+        ...(prepared.filters
+          ? {
+              filters: prepared.filters,
+              filterUndo: structuredClone(s.filters),
+            }
+          : {}),
+        selection: prepared.selection,
+        selectedInvestigationId: prepared.investigationId,
+        ...(prepared.camera
+          ? { cameraCommand: { ...prepared.camera, id: crypto.randomUUID() } }
+          : {}),
+        ...(prepared.timeline
+          ? {
+              timelineIntent: prepared.timeline,
+              investigationTab: "timeline" as const,
+              panel: {
+                view: "investigation" as const,
+                id: prepared.timeline.target.investigation_id,
+              },
+              panelHistory: s.panel
+                ? [...s.panelHistory, s.panel].slice(-16)
+                : s.panelHistory,
+            }
+          : {}),
+        contextRevision: s.contextRevision + 1,
+      }));
+      return true;
+    },
+    undoFilters: () => {
+      const previous = get().filterUndo;
+      if (previous)
+        set((s) => ({
+          filters: previous,
+          filterUndo: null,
+          contextRevision: s.contextRevision + 1,
+        }));
+    },
     panel: null,
     panelHistory: [],
     sheetExpanded: false,
@@ -103,6 +177,7 @@ export function createWorkspaceStore() {
     applyFilters: (filters) =>
       set((state) => ({
         filters: normalizeNewsQuery({ ...filters, offset: 0 }),
+        filterUndo: null,
         selection: { articleId: null, locationId: null },
         selectedInvestigationId: null,
         cameraCommand: null,
@@ -111,6 +186,7 @@ export function createWorkspaceStore() {
     setPage: (offset) =>
       set((state) => ({
         filters: normalizeNewsQuery({ ...state.filters, offset }),
+        filterUndo: null,
         selection: { articleId: null, locationId: null },
         selectedInvestigationId: null,
         cameraCommand: null,
@@ -126,6 +202,9 @@ export function createWorkspaceStore() {
     selectInvestigation: (selectedInvestigationId) =>
       set((state) => ({
         selectedInvestigationId,
+        ...(selectedInvestigationId !== state.selectedInvestigationId
+          ? { investigationTab: "brief" as const, timelineIntent: null }
+          : {}),
         contextRevision: state.contextRevision + 1,
       })),
     setBasemap: (basemap) => set({ basemap }),

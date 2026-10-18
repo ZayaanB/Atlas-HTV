@@ -22,6 +22,7 @@ import { FilterBar } from "../features/feed/FilterBar";
 import { NewsFeed } from "../features/feed/NewsFeed";
 import { CoverageNotice } from "../features/feed/CoverageNotice";
 import { SavedInvestigations } from "../features/feed/SavedInvestigations";
+import { useAssistantSession } from "../features/ai/session";
 import { AssistantPanel } from "../features/ai/AssistantPanel";
 import {
   InvestigationPanel,
@@ -92,7 +93,6 @@ export function App({
     [newsFiltersOpen, setNewsFiltersOpen] = useState(false),
     [saved, setSaved] = useState(readSaved),
     [saveError, setSaveError] = useState(""),
-    [prompt, setPrompt] = useState(""),
     [overlay, setOverlay] = useState<EvidenceOverlay>(null),
     [flightRegion, setFlightRegion] = useState(""),
     [flightsEnabled, setFlightsEnabled] = useState(false),
@@ -114,6 +114,7 @@ export function App({
       .getQueriesData<NewsResponse>({ queryKey: [api.mode, "news"] })
       .flatMap(([, data]) => data?.items ?? [])
       .find((a) => a.id === selectedId);
+  const assistant = useAssistantSession(api, articles, research.data);
   const pendingInvestigationFocus = useRef<string | null>(null);
   useEffect(() => {
     if (
@@ -150,6 +151,8 @@ export function App({
     state.selectInvestigation,
   ]);
   useEffect(() => {
+    if (panel?.view !== "investigation")
+      pendingInvestigationFocus.current = null;
     if (
       research.data &&
       pendingInvestigationFocus.current === research.data.investigation.id
@@ -161,7 +164,7 @@ export function App({
       if (location) state.focusLocation(location);
       pendingInvestigationFocus.current = null;
     }
-  }, [research.data, state.focusLocation]);
+  }, [research.data, state.focusLocation, panel?.view]);
   const error = news.error ?? locations.error,
     loading =
       news.isPending ||
@@ -262,8 +265,9 @@ export function App({
         places.find((l) => article.location_ids.includes(l.id))?.id ?? null,
     });
   }
-  function ask(initial = "") {
-    setPrompt(initial);
+  function ask(initial?: string) {
+    if (initial !== undefined)
+      assistant.populatePrompt({ id: crypto.randomUUID(), text: initial });
     state.openPanel({ view: "assistant" });
   }
   function investigate(id: string) {
@@ -277,6 +281,7 @@ export function App({
       pendingInvestigationFocus.current = null;
     }
     state.selectInvestigation(id);
+    state.setInvestigationTab("brief");
     setOverlay(null);
     state.openPanel({ view: "investigation", id });
   }
@@ -838,10 +843,9 @@ export function App({
           ))}
         <div hidden={panel?.view !== "assistant"}>
           <AssistantPanel
-            api={api}
-            articles={articles}
-            investigation={research.data}
-            initialPrompt={prompt}
+            session={assistant}
+            fixture={api.mode === "fixture"}
+            connected={!!(api.assistant || api.assistantStream)}
           />
         </div>
         <div hidden={panel?.view !== "investigation"}>

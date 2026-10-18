@@ -53,6 +53,10 @@ type _QueryKeys = Expect<
     | "location_ids"
     | "themes"
     | "entity_ids"
+    | "event_types"
+    | "topics"
+    | "verification_status"
+    | "has_location"
     | "bounds"
     | "keyword"
     | "semantic_query"
@@ -175,3 +179,55 @@ void [
   missingCoordinates,
   wrongPrecision,
 ];
+
+// V2 wire types are inferred independently; legacy requests remain closed.
+const v2Request: import("../index.js").AssistantRequestV2 = {
+  protocol_version: 2,
+  request_id: "r",
+  message: "Explain",
+  timezone: "UTC",
+  interaction_mode: "intent",
+  selected_article_id: "art-test",
+  history: [],
+};
+const v2Patch: import("../index.js").AssistantFilterPatch = {
+  set: { themes: ["flooding"] },
+  clear: ["keyword"],
+};
+const v2Timeline: import("../index.js").OpenTimelineArgs = {
+  investigation_id: "inv-test",
+  series_id: "series-test",
+};
+const v2Action: import("../index.js").UIActionV2 = {
+  type: "open_timeline",
+  ...v2Timeline,
+};
+const mixedV2: import("../index.js").AssistantRequestV2 = {
+  ...v2Request,
+  // @ts-expect-error v2 never accepts the legacy authorization flag.
+  allow_ui_actions: true,
+};
+// @ts-expect-error model filter patches are not browser actions.
+const patchAsAction: import("../index.js").UIActionV2 = {
+  type: "set_filters",
+  ...v2Patch,
+};
+void [v2Request, v2Patch, v2Timeline, v2Action, mixedV2, patchAsAction];
+const streamStatus: import("../index.js").AssistantStreamEvent = { type: "status", request_id: "s", phase: "reading" };
+// @ts-expect-error partial text cannot carry workspace actions.
+const unsafeStream: import("../index.js").AssistantStreamEvent = { type: "answer_delta", request_id: "s", text: "Preview", actions: [] };
+void [streamStatus, unsafeStream];
+const researchSearch: import("../index.js").AssistantNewsSearchArgs = { limit: 3, themes: ["flooding"] };
+const researchArticle: import("../index.js").AssistantArticleReadArgs = { id: "art-test", excerpt_offset: 240 };
+const researchInvestigation: import("../index.js").AssistantInvestigationReadArgs = { id: "inv-test", section: "items" };
+const researchCatalog: import("../index.js").AssistantCatalogSearchArgs = { kind: "themes" };
+const researchLocations: import("../index.js").AssistantLocationsSearchArgs = { query: "Asheville" };
+const researchSources: import("../index.js").AssistantSourcesReadArgs = { ids: ["src-test"] };
+const researchHistory: import("../index.js").AssistantHistoryReadArgs = { offset: 2, limit: 1 };
+const researchRecord: import("../index.js").AssistantResearchRecord = { id: "art-test", record_type: "article", published_at: null, published_date: "2024-09-27" };
+const researchResult: import("../index.js").AssistantToolResult = { kind: "article", items: [researchRecord], returned_count: 1, truncated: false };
+// @ts-expect-error Compact tool records cannot carry arbitrary fetched bodies.
+const researchDump: import("../index.js").AssistantResearchRecord = { ...researchRecord, full_article: "body" };
+// @ts-expect-error Discovery categories are a closed enum.
+const arbitraryDatabase: import("../index.js").AssistantCatalogSearchArgs = { kind: "sql" };
+void [researchSearch, researchArticle, researchInvestigation, researchCatalog, researchLocations, researchSources, researchHistory, researchRecord, researchResult, researchDump, arbitraryDatabase];

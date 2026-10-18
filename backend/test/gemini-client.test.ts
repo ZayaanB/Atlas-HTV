@@ -57,3 +57,39 @@ test('production finalization requires declared tools and uses bounded output/th
   for (const env of [{AI_MAX_OUTPUT_TOKENS:'16385'},{AI_MAX_OUTPUT_TOKENS:'511'},{GEMINI_THINKING_LEVEL:'unbounded'}])
     assert.throws(()=>readConfig(env),/Invalid/);
 });
+
+test('failure diagnostics distinguish provider errors, transport timeouts and DNS failures without disclosing raw details', () => {
+  const privateMessage='synthetic-private-prompt-and-key https://private.invalid/';
+  for (const [error,code,fragment] of [
+    [Object.assign(new Error(privateMessage),{status:503}),'GEMINI_UNAVAILABLE','provider HTTP 503'],
+    [Object.assign(new Error(privateMessage),{status:500}),'GEMINI_UNAVAILABLE','provider HTTP 500'],
+    [Object.assign(new Error(privateMessage),{status:504}),'GEMINI_TIMEOUT','provider HTTP 504'],
+    [new DOMException(privateMessage,'AbortError'),'GEMINI_TIMEOUT','timed out'],
+    [new DOMException(privateMessage,'TimeoutError'),'GEMINI_TIMEOUT','timed out'],
+    [new TypeError(privateMessage,{cause:{code:'ENOTFOUND',hostname:'private.invalid'}}),'GEMINI_NETWORK_ERROR','network connection'],
+    [new TypeError(privateMessage,{cause:{code:'UND_ERR_CONNECT_TIMEOUT'}}),'GEMINI_TIMEOUT','timed out'],
+  ] as const) {
+    const failure=modelFailure(error);
+    assert.equal(failure.code,code);assert.equal(failure.retryable,true);assert.ok(failure.message.includes(fragment));
+    assert.ok(!JSON.stringify(failure).includes('private')); assert.ok(!failure.message.includes(privateMessage));
+  }
+});
+
+test('official SDK serializes the actual v2 interpretation schema and preserves sanitized provider status with one stubbed request', async () => {
+  const {GoogleGenAI}=await import('@google/genai');
+  const {modelParameters}=await import('../src/services/gemini/schema.js');
+  const {loadHandoffs}=await import('../src/runtime/handoffs.js');
+  const {contracts}=await loadHandoffs(readConfig({NODE_ENV:'test',ATLAS_CONTRACTS_MODULE:'contracts/dist/index.js'}));
+  let requests=0;
+  const sdk=new GoogleGenAI({apiKey:'synthetic-no-network-key',httpOptions:{retryOptions:{attempts:1},fetch:async (_url,init)=>{
+    requests++;const body=JSON.parse(String(init?.body));
+    assert.equal(body.tools[0].functionDeclarations[0].name,'interpret_request');
+    assert.equal(body.generationConfig?.temperature,undefined);
+    return new Response(JSON.stringify({error:{code:503,message:'synthetic-private-provider-response',status:'UNAVAILABLE'}}),{status:503,headers:{'content-type':'application/json'}});
+  }}});
+  const model=new Gemini(config,sdk);
+  await assert.rejects(model.generate([{role:'user',parts:[{text:'Synthetic question.'}]}],[{name:'interpret_request',parametersJsonSchema:modelParameters(contracts,'AssistantIntent')}],new AbortController().signal,{forceTool:'interpret_request'}),error=>{
+    assert.ok(error instanceof Error);assert.match(error.message,/provider HTTP 503/);assert.ok(!error.message.includes('private-provider'));return true;
+  });
+  assert.equal(requests,1);
+});
