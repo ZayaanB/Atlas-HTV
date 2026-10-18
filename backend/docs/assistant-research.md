@@ -41,6 +41,24 @@ Keep six configured generation rounds and eight tool calls. Interpretation count
 
 The registry caches canonical arguments per question. Filter changes increment its scope revision. Raw reads also reuse private cached records. Research state does not persist across requests, so every question starts bounded.
 
+Filter receipts reuse the authoritative filter-patch key set, including all 12
+keys for a complete reset. When semantic retrieval falls back to literal keywords,
+compact news results and filter-action receipts retain an explicit limitation,
+including empty pages. The limitation also stays in request prompt state after
+context compaction. Successful assistant responses carry the non-retryable
+`SEMANTIC_SEARCH_UNAVAILABLE` notice in `errors`, which the existing chat renders
+alongside answers and status messages even if the model omits the disclosure.
+Pagination limitations remain visible; ordinary keyword searches and successful
+semantic searches do not receive this notice.
+
+Review-fix verification (October 18, 2026): 29 contract tests, 13 actual backend
+compatibility checks, 212 backend tests and 155 frontend tests pass, along with
+contracts/backend/frontend typechecks and builds. Regression cases reproduce both
+original failures and cover empty/populated resets, unavailable/failed embeddings,
+empty/matching fallback results, successful semantic retrieval, filter-command
+receipts and streamed chat notices. All models/repositories/providers are injected;
+no provider or database access was used.
+
 ## Offline profile and activation
 
 ```sh

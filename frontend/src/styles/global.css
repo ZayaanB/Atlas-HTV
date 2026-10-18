@@ -544,6 +544,9 @@ details[open] > summary {
   min-height: 32px;
   border-radius: 20px;
   padding: 5px 12px;
+  max-width: min(420px, calc(100vw - 40px));
+  text-align: start;
+  color: #f5d547;
 }
 .wind-status {
   position: absolute;
@@ -561,6 +564,16 @@ details[open] > summary {
 .wind-status p { margin: 5px 0 0; }
 .wind-status button { font-size: 12px; }
 .wind-status a { color: #a7d5ff; }
+.flight-controls { overflow-wrap: anywhere; }
+.flight-controls select { max-width: 100%; }
+.flight-toggle input { accent-color: #f5d547; }
+.aircraft-search input { width: 100%; font-size: 16px; }
+.aircraft-matches { list-style: none; padding: 0; max-height: 240px; overflow-y: auto; }
+.aircraft-matches button { width: 100%; text-align: start; display: grid; gap: 4px; padding: 10px 12px; }
+.aircraft-matches span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.flight-legend span { width: 24px; border-top: 1px dashed #f5d547; flex: none; }
+.flight-availability { color: var(--muted); font-size: 12px; margin-block: 16px; }
+.flight-availability p { margin-block: 6px; }
 .content-panel {
   position: absolute;
   z-index: 6;

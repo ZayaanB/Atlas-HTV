@@ -358,19 +358,29 @@ export const aircraftSchema = object(
   "AircraftState",
   {
     id: recordId,
-    provider: { const: "adsb.lol" },
+    provider: { enum: ["adsb.lol", "airlabs"] },
     callsign: nullableText,
+    registration: nullable({ ...text, maxLength: 32, pattern: "^\\S(?:[\\s\\S]*\\S)?$" } as const),
+    aircraft_type: nullable({ ...text, maxLength: 16, pattern: "^\\S(?:[\\s\\S]*\\S)?$" } as const),
+    operator: nullableText,
+    on_ground: nullable({ type: "boolean" } as const),
+    flight_iata: nullable({ ...text, maxLength: 32 } as const),
+    airline_icao: nullable({ ...text, maxLength: 32 } as const),
+    airline_iata: nullable({ ...text, maxLength: 32 } as const),
+    departure_iata: nullable({ ...text, maxLength: 32 } as const),
+    arrival_iata: nullable({ ...text, maxLength: 32 } as const),
+    direction_kind: { enum: ["direction", "ground_track"] },
     coordinates,
     altitude: nullable({ type: "number" } as const),
-    altitude_unit: { const: "ft" },
-    altitude_reference: { const: "barometric" },
+    altitude_unit: { enum: ["ft", "m"] },
+    altitude_reference: { enum: ["barometric", "unknown"] },
     speed: nullable({ type: "number" } as const),
     speed_unit: { const: "kn" },
     heading: nullable({ type: "number", minimum: 0, maximum: 360 } as const),
     observed_at: utcDateTime,
     fetched_at: utcDateTime,
     source_url: httpsUrl,
-    license: { const: "ODbL-1.0" },
+    license: { enum: ["ODbL-1.0", "AirLabs-terms"] },
   },
   [
     "id",
@@ -423,6 +433,70 @@ export const flightsResponseSchema = object(
     "retry_at",
     "error",
   ] as const,
+);
+export const flightAreaQuerySchema = object(
+  "FlightAreaQuery",
+  {
+    latitude: { type: "number", minimum: -90, maximum: 90 },
+    longitude: { type: "number", minimum: -180, maximum: 180 },
+    radius_nm: { type: "integer", minimum: 1, maximum: 100 },
+  },
+  ["latitude", "longitude", "radius_nm"] as const,
+);
+export const flightAreaResponseSchema = object(
+  "FlightAreaResponse",
+  {
+    area: ref("FlightRegion"),
+    items: { type: "array", items: ref("AircraftState"), maxItems: 500 },
+    fetched_at: nullableUtcDateTime,
+    status: { enum: ["waiting", "unavailable", "ready"] },
+    stale: { type: "boolean" },
+    truncated: { type: "boolean" },
+    mode: { const: "live" },
+    replay: { const: false },
+    attribution: text,
+    retry_at: utcDateTime,
+    error: nullableText,
+  },
+  ["area", "items", "fetched_at", "status", "stale", "truncated", "mode", "replay", "attribution", "retry_at", "error"] as const,
+);
+export const flightGlobalResponseSchema = object(
+  "FlightGlobalResponse",
+  {
+    snapshot_id: nullableText,
+    items: { type: "array", items: ref("AircraftState"), maxItems: 25000 },
+    trails: {
+      type: "array", maxItems: 25000,
+      items: {
+        type: "object",
+        properties: {
+          aircraft_id: recordId,
+          points: {
+            type: "array", maxItems: 8,
+            items: {
+              type: "object",
+              properties: { coordinates, observed_at: utcDateTime, callsign: nullableText, flight_iata: nullableText },
+              required: ["coordinates", "observed_at", "callsign", "flight_iata"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["aircraft_id", "points"],
+        additionalProperties: false,
+      },
+    },
+    fetched_at: nullableUtcDateTime,
+    status: { enum: ["ready", "waiting", "unavailable"] },
+    stale: { type: "boolean" },
+    truncated: { type: "boolean" },
+    mode: { const: "live" },
+    replay: { const: false },
+    attribution: text,
+    retry_at: nullableUtcDateTime,
+    pause_reason: { enum: ["quota", "authentication", "configuration", null] },
+    error: nullableText,
+  },
+  ["snapshot_id", "items", "trails", "fetched_at", "status", "stale", "truncated", "mode", "replay", "attribution", "retry_at", "pause_reason", "error"] as const,
 );
 export const actionSchema = {
   $schema: draft,
@@ -508,6 +582,8 @@ export const workspaceResponseSchema = object(
         investigations: { type: "boolean" },
         assistant: { type: "boolean" },
         flights: { type: "boolean" },
+        flight_areas: { type: "boolean" },
+        flight_global: { type: "boolean" },
         observations: { type: "boolean" },
         assistant_context: { type: "boolean" },
         series_filter: { type: "boolean" },
@@ -577,6 +653,9 @@ export const featureSchemas = {
     ["region_id", "identifier"] as const,
   ),
   FlightsResponse: flightsResponseSchema,
+  FlightAreaQuery: flightAreaQuerySchema,
+  FlightAreaResponse: flightAreaResponseSchema,
+  FlightGlobalResponse: flightGlobalResponseSchema,
   FocusLocationArgs: object("FocusLocationArgs", { location_id: recordId }, [
     "location_id",
   ] as const),
@@ -603,6 +682,9 @@ const references = [
   actionSchema,
 ] as const;
 export type FeatureContracts = {
+  FlightGlobalResponse: FromSchema<typeof flightGlobalResponseSchema, { references: [...typeof references] }>;
+  FlightAreaQuery: FromSchema<typeof flightAreaQuerySchema>;
+  FlightAreaResponse: FromSchema<typeof flightAreaResponseSchema, { references: [...typeof references] }>;
   Observation: FromSchema<
     typeof featureSchemas.Observation,
     { references: [...typeof references] }

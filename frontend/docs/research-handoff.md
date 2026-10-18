@@ -54,3 +54,7 @@ The historical fixture is derived from committed seed literals/CSV and labeled e
 ## Assistant v2 delivery
 
 The frontend now uses the eight authoritative v2 contracts and always posts version 2 with `interaction_mode:"intent"`. The v1 consent control is removed. Conversation/session data lives at App lifetime; workspace actions resolve every target before one Zustand commit. Suggested and explicit timelines share validation and preserve exact UTC timestamps. See [assistant v2 delivery](assistant-v2.md) for activation and exact verification results. This supersedes the v1 frontend assistant notes above; existing backend ownership and live-service boundaries still apply.
+
+## Flight area integration
+
+The optional flight overlay now prefers global airline snapshots through `capabilities.flight_global`, with area/legacy compatibility retained. The **Global airline snapshot** section of the [backend handoff](../../backend/docs/flights-area-handoff.md) is the authoritative interface. See [flight integration and Person 3 follow-up](flights-overlay.md) for shared schema exports, scheduler/expiry rules, synthetic backend/browser evidence, bounded live results and remaining live Back/dated-evidence gaps. No frontend credentials or backend implementation changes were required by the frontend integration.

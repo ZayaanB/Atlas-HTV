@@ -1,4 +1,6 @@
+import { fileURLToPath } from 'node:url';
 import { AppError } from './runtime/errors.js';
+import { flightUserAgent } from './data/providers/flight-identity.js';
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   const integer = (key: string, fallback: number, min: number, max: number) => {
     if (env[key] !== undefined && !/^\d+$/.test(env[key]!)) throw new AppError('CONFIG_INVALID', `Invalid ${key}`, 500);
@@ -36,6 +38,12 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   const flightsStaleMs = integer('FLIGHTS_STALE_AFTER_MS',120000,1000,3600000);
   const flightsExpireMs = integer('FLIGHTS_CACHE_TTL_MS',300000,1000,3600000);
   if (flightsStaleMs > flightsExpireMs) throw new AppError('CONFIG_INVALID','Flight expiry must be at least the stale threshold',500);
+  const flightsEnabled = flag('FLIGHTS_ENABLED'), flightsContact = optional('FLIGHTS_CONTACT');
+  const flightsProvider = optional('FLIGHTS_PROVIDER') ?? 'adsb.lol';
+  if (!['adsb.lol', 'airlabs'].includes(flightsProvider)) throw new AppError('CONFIG_INVALID', 'Invalid FLIGHTS_PROVIDER', 500);
+  const airlabsKey = optional('AIRLABS_API_KEY');
+  if (flightsProvider === 'adsb.lol' && (flightsEnabled || flightsContact !== undefined)) flightUserAgent(flightsContact);
+  if (flightsEnabled && flightsProvider === 'airlabs' && !airlabsKey) throw new AppError('CONFIG_INVALID', 'AIRLABS_API_KEY is required', 500);
   return {
     nodeEnv, host: env.HOST ?? '127.0.0.1', port: integer('PORT', 3001, 1, 65535),
     databaseUrl, databaseCaFile: optional('DATABASE_CA_FILE'),
@@ -48,12 +56,15 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     aiMaxTools: integer('AI_MAX_TOOL_CALLS', 8, 1, 16), aiMaxRounds: integer('AI_MAX_ROUNDS', 4, 1, 8),
     aiMaxContextBytes: integer('AI_MAX_CONTEXT_BYTES', 64000, 4000, 128000),
     aiMaxOutputTokens: integer('AI_MAX_OUTPUT_TOKENS', 8192, 512, 16384),
-    flightsEnabled: flag('FLIGHTS_ENABLED'),
     windEnabled: env.WIND_ENABLED === undefined ? true : flag('WIND_ENABLED'),
+    flightsEnabled, flightsContact, flightsProvider, airlabsKey,
+    flightsBudgetDirectory: optional('FLIGHTS_BUDGET_DIRECTORY') ?? fileURLToPath(new URL('../.flight-budget/', import.meta.url)),
     flightsRefreshMs: integer('FLIGHTS_REFRESH_INTERVAL_MS', 60000, 30000, 3600000),
     flightsStaleMs: integer('FLIGHTS_STALE_AFTER_MS', 120000, 1000, 3600000),
     flightsExpireMs: integer('FLIGHTS_CACHE_TTL_MS', 300000, 1000, 3600000),
-    flightsMaxRegions: integer('FLIGHTS_MAX_ACTIVE_REGIONS', 3, 1, 10),
+    flightsMaxRegions: integer('FLIGHTS_MAX_ACTIVE_REGIONS', 2, 1, 10),
+    flightsGlobalRefreshMs: integer('FLIGHTS_GLOBAL_INTERVAL_MS', 30000, 30000, 3600000),
+    flightsActiveMs: integer('FLIGHTS_AREA_IDLE_MS', 120000, 60000, 3600000),
     providerTimeoutMs: integer('PROVIDER_TIMEOUT_MS', 8000, 100, 30000),
     ingestionProviderTimeoutMs: integer('INGESTION_PROVIDER_TIMEOUT_MS',30000,100,30000),
     rateMax: integer('RATE_LIMIT_MAX', 120, 1, 1000),
