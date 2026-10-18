@@ -172,6 +172,8 @@ Valid JSON assistant POSTs use Atlas-owned lifecycle cancellation: request-body 
 
 ### Global airline demo (AirLabs)
 
+Person 4: follow the [flight deployment handoff](docs/flight-deployment-handoff.md) for the required persistent systemd state directory, private environment, quota preservation, and bounded hosted acceptance. Flights need no new database migration or cron job; the current service unit needs a writable ledger directory before AirLabs can run.
+
 The global backend, shared `FlightGlobalResponse`, compatible aircraft extensions,
 `flight_global` capability and global frontend/map are delivered and synthetically
 verified. Rebuild contracts before restarting the backend. A process loading an
