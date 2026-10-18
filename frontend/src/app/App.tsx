@@ -380,7 +380,7 @@ export function App({
           />
         </div>
         <header className="identity">
-          <span className="brand">ATLAS</span>
+          <span className="brand"><span className="brand-wordmark">ATLAS</span></span>
           <AudienceSelect />
           {!state.audienceStorageAvailable && <span role="status" className="audience-storage-note">Preference kept for this visit only.</span>}
           {api.mode === 'fixture' && <button

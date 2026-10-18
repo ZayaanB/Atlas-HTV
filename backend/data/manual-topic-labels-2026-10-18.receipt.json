@@ -1,0 +1,377 @@
+{
+  "status": "committed",
+  "applied_at": "2026-10-18T06:13:35.188Z",
+  "inserted_themes": [
+    "business",
+    "cyclone",
+    "drought",
+    "earthquake",
+    "environment",
+    "politics",
+    "science",
+    "technology",
+    "wildfire"
+  ],
+  "inserted_links": [
+    {
+      "article_id": "article-bc442516adae0e5d70e54f4e51e8e2aed1f7af3b9b02baf518443b0b76e2ee92",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-bc442516adae0e5d70e54f4e51e8e2aed1f7af3b9b02baf518443b0b76e2ee92",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-8de9d9504fb751733f8a195d0d49b9f7d7b9a1c0748b19f60500c2dafe4b37c8",
+      "theme_id": "earthquake"
+    },
+    {
+      "article_id": "article-8de9d9504fb751733f8a195d0d49b9f7d7b9a1c0748b19f60500c2dafe4b37c8",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-dbcc905f24d7ffbc04f4f85fad2928c581e65b3083a703a3be57187800ffb4da",
+      "theme_id": "cyclone"
+    },
+    {
+      "article_id": "article-dbcc905f24d7ffbc04f4f85fad2928c581e65b3083a703a3be57187800ffb4da",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-072d14671b798f80555ca40533012e9d5490e5000d7d1d323ef3e45148dbea89",
+      "theme_id": "hurricanes"
+    },
+    {
+      "article_id": "article-072d14671b798f80555ca40533012e9d5490e5000d7d1d323ef3e45148dbea89",
+      "theme_id": "infrastructure"
+    },
+    {
+      "article_id": "article-072d14671b798f80555ca40533012e9d5490e5000d7d1d323ef3e45148dbea89",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-072d14671b798f80555ca40533012e9d5490e5000d7d1d323ef3e45148dbea89",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-5e1c3a449af9cc64bb5bec48ec0c534d453a215d9c567c02fe6e31921b3c9243",
+      "theme_id": "earthquake"
+    },
+    {
+      "article_id": "article-5e1c3a449af9cc64bb5bec48ec0c534d453a215d9c567c02fe6e31921b3c9243",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-ea3fd64a0551a6d609d7c97aa9df1d1ac08ce000c1ddcaab293e069f6ec0651c",
+      "theme_id": "earthquake"
+    },
+    {
+      "article_id": "article-ea3fd64a0551a6d609d7c97aa9df1d1ac08ce000c1ddcaab293e069f6ec0651c",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-aa0bb81c2fa2b59212cd8dd3c4e09df930c45f0a7ad733cb09aeadca40cdece1",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-aa0bb81c2fa2b59212cd8dd3c4e09df930c45f0a7ad733cb09aeadca40cdece1",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-5f2528424985d275b374698282e5dfedfc93fcab8db061bafb342f6978ae3e67",
+      "theme_id": "wildfire"
+    },
+    {
+      "article_id": "article-5f2528424985d275b374698282e5dfedfc93fcab8db061bafb342f6978ae3e67",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-5f2528424985d275b374698282e5dfedfc93fcab8db061bafb342f6978ae3e67",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-0a8b9481f51a388e862490f5862694c0cdeebae499dbc03d28006a6523d78abc",
+      "theme_id": "cyclone"
+    },
+    {
+      "article_id": "article-0a8b9481f51a388e862490f5862694c0cdeebae499dbc03d28006a6523d78abc",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-f03cbf57ebc657bd4cefcf51fccbe6952c1e102de346f293f425909cc6df53bf",
+      "theme_id": "earthquake"
+    },
+    {
+      "article_id": "article-f03cbf57ebc657bd4cefcf51fccbe6952c1e102de346f293f425909cc6df53bf",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-70642f274a7e7f52c5cd4ee90a1294e130a76ab08b4c364f8b52d28cc6efe108",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-70642f274a7e7f52c5cd4ee90a1294e130a76ab08b4c364f8b52d28cc6efe108",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-f82611f63f3aba5ce997f533c6edd2f0da68721e612c5ef7e26f3016f92218b6",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-f82611f63f3aba5ce997f533c6edd2f0da68721e612c5ef7e26f3016f92218b6",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-9759b7394ace506100307ba8322af59305b524faca5645c6cb6c6cbd73ea2b43",
+      "theme_id": "hurricanes"
+    },
+    {
+      "article_id": "article-9759b7394ace506100307ba8322af59305b524faca5645c6cb6c6cbd73ea2b43",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-9759b7394ace506100307ba8322af59305b524faca5645c6cb6c6cbd73ea2b43",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-9759b7394ace506100307ba8322af59305b524faca5645c6cb6c6cbd73ea2b43",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-b017df62841bd87608cbda2facd1463c76ef0a5c727b49b50b52a1b2b434b7f0",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-b017df62841bd87608cbda2facd1463c76ef0a5c727b49b50b52a1b2b434b7f0",
+      "theme_id": "technology"
+    },
+    {
+      "article_id": "article-44dbcee82122f9c0d18b35385d4be027b129de72c2078a98bf26b896f3787985",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-44dbcee82122f9c0d18b35385d4be027b129de72c2078a98bf26b896f3787985",
+      "theme_id": "technology"
+    },
+    {
+      "article_id": "article-c0d9b7ae26fda919c7d869a889da3587170152bebf9f37ab2aa43511f20e673a",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-c0d9b7ae26fda919c7d869a889da3587170152bebf9f37ab2aa43511f20e673a",
+      "theme_id": "technology"
+    },
+    {
+      "article_id": "article-4c493ed319e7f16a9de2c18bc1dd318292dd4d29962539bbb902599a7966cb00",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-4c493ed319e7f16a9de2c18bc1dd318292dd4d29962539bbb902599a7966cb00",
+      "theme_id": "technology"
+    },
+    {
+      "article_id": "article-e2e9477ed1e9b78d03e2bfb1488caaa46fc994908a3aacad3bfc0060fd065ed3",
+      "theme_id": "cyclone"
+    },
+    {
+      "article_id": "article-e2e9477ed1e9b78d03e2bfb1488caaa46fc994908a3aacad3bfc0060fd065ed3",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-76663832d6deac25d80001ac5cfc9f815ea5d3ce470a5cffc6337b16b5ffc2bf",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-d9701230036316a1e33024b8cb42e8221d6c3e35f9dcf503cf9fd9b64cb10cb6",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-d9701230036316a1e33024b8cb42e8221d6c3e35f9dcf503cf9fd9b64cb10cb6",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-a7867473cdb52eec78505be6098ab6536eaa4dd05b9b632b206d21fe5669ede8",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-a7867473cdb52eec78505be6098ab6536eaa4dd05b9b632b206d21fe5669ede8",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-bd894f7c206fbf14279fb587737cfba8f9efcb9276fc50d92fc08390d24d2eb7",
+      "theme_id": "cyclone"
+    },
+    {
+      "article_id": "article-bd894f7c206fbf14279fb587737cfba8f9efcb9276fc50d92fc08390d24d2eb7",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-29e85c170f3e8c4382f1f127adf9e5a0e7e287c3d820aebd2da0a3544c911cea",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-29e85c170f3e8c4382f1f127adf9e5a0e7e287c3d820aebd2da0a3544c911cea",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-4f89388d6e84ff78c35ebe1d77b2bb6fcad8aeefb1c64d2fcdbd255db75a55db",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-4f89388d6e84ff78c35ebe1d77b2bb6fcad8aeefb1c64d2fcdbd255db75a55db",
+      "theme_id": "science"
+    },
+    {
+      "article_id": "article-4f89388d6e84ff78c35ebe1d77b2bb6fcad8aeefb1c64d2fcdbd255db75a55db",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-dd4fa48555372b17a74feff60b978758584e2f84fca5129805743ba95a3be133",
+      "theme_id": "cyclone"
+    },
+    {
+      "article_id": "article-dd4fa48555372b17a74feff60b978758584e2f84fca5129805743ba95a3be133",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-20cc9c398da717582f9308070667a1af802aa72ad788d4fa1d0e3688f93a05ab",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-20cc9c398da717582f9308070667a1af802aa72ad788d4fa1d0e3688f93a05ab",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-6939d5c2ff2fa6ad289bc7366533a88eebdf483f60742be7db67ed69a4ef2ae4",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-6939d5c2ff2fa6ad289bc7366533a88eebdf483f60742be7db67ed69a4ef2ae4",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-c0fc72e860aa6f58e55a930fd11124a68c6b11828d772737b14916cc1bc3e4a6",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-c0fc72e860aa6f58e55a930fd11124a68c6b11828d772737b14916cc1bc3e4a6",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-9d6a903e3130f91953094515454a8534e140b21c659a48fb2c765ce1fb314fdf",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-9d6a903e3130f91953094515454a8534e140b21c659a48fb2c765ce1fb314fdf",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-13b2cb7ce2cda1c410afefb924294b59b148999fc4b870cf7ff6e5ba1e3c0fec",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-13b2cb7ce2cda1c410afefb924294b59b148999fc4b870cf7ff6e5ba1e3c0fec",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-c265eb9408320f1e74843623fd0ed6195d613bf4c753f77f220a863163414e9e",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-c265eb9408320f1e74843623fd0ed6195d613bf4c753f77f220a863163414e9e",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-8830427e79a6aebb5a949b7a4094ec56adda0e0193707853d007582f72235b21",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-8830427e79a6aebb5a949b7a4094ec56adda0e0193707853d007582f72235b21",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-0dbaa986cdbc6256b688fb4924b6f249c2d7df408c3dc483babef5fd6400dc24",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-0dbaa986cdbc6256b688fb4924b6f249c2d7df408c3dc483babef5fd6400dc24",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-60b167fca8351752c7e72e76e3f97a90641971cf2768c12755a73c9ef75b81a8",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-60b167fca8351752c7e72e76e3f97a90641971cf2768c12755a73c9ef75b81a8",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-7352e2b05986ecb19d69e391414292cd0b77476d6dc6d3d886a7eebd6378ba1c",
+      "theme_id": "flooding"
+    },
+    {
+      "article_id": "article-7352e2b05986ecb19d69e391414292cd0b77476d6dc6d3d886a7eebd6378ba1c",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-fb6fa58a1779f4483c804f299e8a60554383eb7125c23299fec698bd38da9f80",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-fb6fa58a1779f4483c804f299e8a60554383eb7125c23299fec698bd38da9f80",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-1218e6dca9dd89301a94b7d2e53c00231355dc64a254025fb7656c5e7dc38f5a",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-1218e6dca9dd89301a94b7d2e53c00231355dc64a254025fb7656c5e7dc38f5a",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-97fa9edc7cd5a061ae3f07ea9958fbfd3973ef016b190f26a363fc4aea0c1d2f",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-97fa9edc7cd5a061ae3f07ea9958fbfd3973ef016b190f26a363fc4aea0c1d2f",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-83ac70823681cb13899d2b516fbed2e8dcc971b9b0bf9e85c78185cce0409ab7",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-83ac70823681cb13899d2b516fbed2e8dcc971b9b0bf9e85c78185cce0409ab7",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-bc0d234d4bf1bf2df4ec11e42365fa0447f3b7a34c105211a22947c1876029d1",
+      "theme_id": "drought"
+    },
+    {
+      "article_id": "article-bc0d234d4bf1bf2df4ec11e42365fa0447f3b7a34c105211a22947c1876029d1",
+      "theme_id": "environment"
+    },
+    {
+      "article_id": "article-2392d6b10c717940e37d5788668daffd682f25cbf088be271c991eeab6ed0c7f",
+      "theme_id": "business"
+    },
+    {
+      "article_id": "article-63c0016ae89689bcdbebd75fe0087199f10156f61127b62e4867f425ef3a96b5",
+      "theme_id": "politics"
+    },
+    {
+      "article_id": "article-8d21461465223b55dfc41bca5e6d600812e17a55ddec26d8787621c9f26c3c11",
+      "theme_id": "business"
+    },
+    {
+      "article_id": "article-8d21461465223b55dfc41bca5e6d600812e17a55ddec26d8787621c9f26c3c11",
+      "theme_id": "politics"
+    },
+    {
+      "article_id": "article-dce333e443352e0234bfdd43235945cc4f7588a63acf2be2ef8d8a10e2aaf07f",
+      "theme_id": "technology"
+    }
+  ]
+}
