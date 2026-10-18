@@ -25,7 +25,7 @@ Aircraft selection remains separate in the store; aircraft/evidence data inputs 
 
 ## First integration verification
 
-Run fixture mode, verify map and feed use the same page, select in both directions, focus a sourced city extent, pan without changing the feed, apply Search this area, and return to globe without clearing filters. Verify the renderer tolerates missing locations, loading/empty/error states, and repeated React renders. Actual Mapbox navigation, attribution, precision, reduced motion, style restoration, and token restrictions remain Person 2's checks when rendering is implemented.
+Run fixture mode, verify map and feed use the same page, select in both directions, focus a sourced city extent, pan without changing the feed, and return to globe without clearing filters. The Search this area button has been removed. Verify the renderer tolerates missing locations, loading/empty/error states, and repeated React renders. Actual Mapbox navigation, attribution, precision, reduced motion, style restoration, and token restrictions remain Person 2's checks when rendering is implemented.
 
 ## Implemented interface additions
 

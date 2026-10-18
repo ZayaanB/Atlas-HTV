@@ -16,6 +16,16 @@ function setup(model?: Model, config = readConfig({NODE_ENV:'test'})) {
   return {contracts,repo,retrieval,assistant:new Assistant(config,contracts,retrieval,undefined,model)};
 }
 const final = (value: unknown): ModelTurn => ({content:{role:'model',parts:[{text:JSON.stringify(value)}]},text:JSON.stringify(value),calls:[]});
+test('legacy demo research has no hidden round or tool-call cap',async()=>{
+  let generations=0;
+  const model:Model={generate:async()=>{
+    if(generations++===20) return final(draft);
+    return {content:{role:'model',parts:[{functionCall:{name:'search_news',args:{}}}]},calls:[{name:'search_news',args:{}}],text:''};
+  }};
+  const {assistant}=setup(model,readConfig({NODE_ENV:'test',AI_DEMO_MODE:'true'}));
+  const response=await assistant.answer(input);
+  assert.equal(response.mode,'fixture',JSON.stringify(response.errors)); assert.equal(generations,21);
+});
 test('ledger rejects invented citations, mismatched URLs and unrelated source/record pairs',() => {
   const contracts = testContracts(), ledger = new EvidenceLedger();
   ledger.collect([protocolArticle('test-a'),protocolArticle('test-b')]);

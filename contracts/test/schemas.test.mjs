@@ -52,6 +52,41 @@ const gauge = examples.locations.find(
   (location) => location.precision === "facility",
 );
 
+const assistantWorkspace = {
+  revision: 1, captured_at: '2026-10-18T12:00:00.000Z',
+  viewport: { bounds: [-80, 43, -79, 44], center: [-79.5, 43.5], zoom: 9 }, filters: {},
+  selection: { article_id: null, investigation_id: null, location_id: null, aircraft_id: null },
+  origin: { view: 'news' }, visible_article_ids: [], timeline: null, basemap: 'map',
+  layers: { flights: false, wind: false }, capabilities: { flights: false, wind: false }, flight_context: null,
+};
+test('v3 snapshots preserve viewport/result context and remain incompatible with legacy requests', () => {
+  const input = { protocol_version: 3, request_id: 'v3-schema', turn_id: 'turn-1', message: 'What is happening here?', timezone: 'UTC', workspace: assistantWorkspace };
+  valid('AssistantRequestV3', input); invalid('AssistantRequestV2', input); invalid('AssistantRequest', input);
+  invalid('AssistantRequestV3', { ...input, workspace: { ...assistantWorkspace, screenshot_url: 'https://example.invalid' } });
+  invalid('AssistantRequestV3', { ...input, workspace: { ...assistantWorkspace, viewport: { ...assistantWorkspace.viewport, center: [43, 181] } } });
+  invalid('AssistantRequestV3', { ...input, workspace: { ...assistantWorkspace, visible_article_ids: ['same-id', 'same-id'] } });
+});
+test('v3 workspace actions remain bounded to existing UI controls and validated record IDs', () => {
+  for (const action of [
+    { type: 'open_record', record_type: 'article', id: knownArticle.id },
+    { type: 'set_basemap', basemap: 'satellite' }, { type: 'set_layers', wind: true }, { type: 'navigate_map', command: 'zoom_out' },
+  ]) valid('UIActionV3', action);
+  invalid('UIActionV3', { type: 'navigate_map', command: 'execute', code: 'arbitrary code' });
+  invalid('UIActionV3', { type: 'open_record', record_type: 'article', id: 'https://example.invalid' });
+  invalid('UIActionV3', { type: 'set_layers', wind: true, provider: 'invented-provider' });
+  invalid('UIActionV3', { type: 'set_layers' });
+});
+test('v3 fallback cannot carry active references/proposals and terminal streams do not downgrade', () => {
+  const response = { protocol_version: 3, request_id: 'v3-schema', conversation_id: 'conversation-1', context: assistantWorkspace,
+    research_scope: {}, references: [], pending: null, kind: 'answer', answer: 'Assistant unavailable.', mode: 'fallback',
+    coverage: { mode: 'fixture', live: false }, errors: [], citations: [], result_ids: [], actions: [], search: null, resolved_range: null, timeline: null };
+  valid('AssistantResponseV3', response);
+  valid('AssistantStreamEventV3', { type: 'complete', request_id: response.request_id, response });
+  invalid('AssistantStreamEvent', { type: 'complete', request_id: response.request_id, response });
+  invalid('AssistantResponseV3', { ...response, references: [{ record_type: 'article', id: knownArticle.id, label: knownArticle.title }] });
+  invalid('AssistantResponseV3', { ...response, pending: { id: 'pending-1', question: 'Apply?', choices: [], actions: [] } });
+});
+
 test("all public schemas compile, register by name, and resolve from another schema", () => {
   assert.ok(Object.keys(schemas).length >= 31);
   for (const name of [

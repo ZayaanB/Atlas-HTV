@@ -29,7 +29,7 @@ export async function createServices(config: Config): Promise<Services> {
   const retrieval = new Retrieval(contracts,repository,new Embeddings(config));
   const flights = new Flights(contracts,config,regions,config.flightsEnabled && config.flightsProvider === 'adsb.lol' ? new AdsbLol(contracts,config.providerTimeoutMs,config.flightsContact!) : undefined, Date.now,
     config.flightsEnabled && config.flightsProvider === 'airlabs' ? new GlobalFlights(contracts, new AirLabs(contracts,config.airlabsKey!,config.providerTimeoutMs), new FileFlightBudget(config.flightsBudgetDirectory)) : undefined);
-  const assistant = new Assistant(config,contracts,retrieval,flights,config.geminiKey ? new Gemini(config) : undefined);
   const wind = new Wind(contracts, config.providerTimeoutMs, config.windEnabled ? new OpenMeteo() : undefined);
+  const assistant = new Assistant(config,contracts,retrieval,flights,config.geminiKey ? new Gemini(config) : undefined, Date.now, undefined, wind);
   return {contracts,repository,retrieval,flights,assistant,wind};
 }

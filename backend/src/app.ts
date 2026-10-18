@@ -20,7 +20,8 @@ export async function buildApp(config: Config, injected?: Services) {
     logger: config.nodeEnv !== 'test' ? { level:'info', redact:['req.headers.authorization','req.headers.cookie','req.body','res.headers.set-cookie'] } : false,
     // The socket inactivity timeout must outlast our processing deadline. A
     // fixed 10 s timeout disconnected valid non-streaming Gemini responses.
-    logController:new LogController({disableRequestLogging:true}), bodyLimit:32768, requestTimeout:30000, connectionTimeout:config.requestTimeoutMs+1000,
+    logController:new LogController({disableRequestLogging:true}), bodyLimit:32768, requestTimeout:30000,
+    connectionTimeout:Math.max(config.requestTimeoutMs,config.aiDemoMode ? config.aiTimeoutMs+1000 : 0)+1000,
     forceCloseConnections:'idle', trustProxy:false
   });
   await app.register(rateLimit, { max:config.rateMax,timeWindow:'1 minute',
@@ -34,13 +35,15 @@ export async function buildApp(config: Config, injected?: Services) {
     // which also fires after a complete POST body. Track actual disconnects and
     // the whole lifecycle deadline ourselves so valid JSON posts remain usable.
     request.atlasSignal = controller.signal;
+    const timeout = config.aiDemoMode && request.routeOptions.url === '/api/assistant'
+      ? Math.max(config.requestTimeoutMs, config.aiTimeoutMs + 1000) : config.requestTimeoutMs;
     const deadline=setTimeout(()=>{
       if (reply.sent || reply.raw.destroyed) return;
       const error=new AppError('REQUEST_TIMEOUT','Request processing timed out',503,true);
       controller.abort(error);
       if (reply.raw.headersSent) reply.raw.destroy();
       else reply.send(error);
-    },config.requestTimeoutMs).unref();
+    },timeout).unref();
     const cleanup=()=>{
       clearTimeout(deadline);controllers.delete(controller);
       request.raw.off('aborted',abort);reply.raw.off('close',abort);reply.raw.off('finish',cleanup);
@@ -76,7 +79,7 @@ export async function buildApp(config: Config, injected?: Services) {
   });
   app.setNotFoundHandler((request,reply) => reply.code(404).send({error:{code:'NOT_FOUND',message:'Endpoint not found',retryable:false,request_id:request.id}}));
   healthRoutes(app,services); newsRoutes(app,services); locationsRoutes(app,services);
-  investigationsRoutes(app,services); observationsRoutes(app,services); flightsRoutes(app,services); assistantRoutes(app,services);
+  investigationsRoutes(app,services); observationsRoutes(app,services); flightsRoutes(app,services); assistantRoutes(app,services,config);
   workspaceRoutes(app,services,config);
   windRoutes(app,services);
   app.addHook('preClose',async () => { for (const controller of controllers) controller.abort(); });

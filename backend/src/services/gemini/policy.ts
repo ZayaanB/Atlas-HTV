@@ -7,7 +7,7 @@ const publication = ['published_from', 'published_to'];
 
 // The intent model must point to an actual unquoted command in this message.
 // This conservative English command gate is deliberately narrower than general
-// language understanding: uncertain authorization becomes a clarification.
+// language understanding: uncertain authorization permits only read-only research.
 export function explicitCommand(message: string, quote: string, action: string): boolean {
   if (!quote.trim() || quote !== quote.trim()) return false;
   const at = message.indexOf(quote);
@@ -17,6 +17,7 @@ export function explicitCommand(message: string, quote: string, action: string):
   const sentence = masked.slice(0, at).split(/[.;!?\n]/).at(-1)!;
   if (/\b(?:not|never|don't|dont|cannot|can't|without|avoid|if|said|saying|means?|explain|describe|whether|how|why|example)\b/i.test(sentence + ' ' + quote)) return false;
   const command = quote.replace(/^(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?/i, '');
+  if (action === 'set_filters' && /^(?:find|search|show)\b/i.test(command) && /\b(?:articles?|stories|story|reporting)\b/i.test(command) && !/\bfilters?\b/i.test(command)) return false;
   if (action === 'set_filters') return /^(?:show|find|search|filter|switch|change|set|clear|remove|reset|use)\b/i.test(command);
   if (action === 'focus_location') return /^(?:zoom|focus|fly|pan|center|centre|take me)\b/i.test(command);
   return action === 'open_timeline' && /^(?:show|open|display)\b/i.test(command) && /\b(?:timeline|chart|history)\b/i.test(command);
@@ -50,7 +51,7 @@ export function mergeFilterPatch(current: Data, raw: Data, authorized: Set<strin
 
 export function clarification(reason: string): string {
   const messages: Record<string, string> = {
-    ambiguous_intent: 'Would you like me to change the workspace, or answer using the current view?',
+    ambiguous_intent: 'Which topic or place would you like to explore?',
     missing_location: 'Which place should I use? Select a location or explicitly choose a map area.',
     ambiguous_location: 'Which of the available locations did you mean?',
     missing_metric: 'Which available observation metric would you like to compare?',

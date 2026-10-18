@@ -231,8 +231,8 @@ All tools are allowlisted and use the same validated query/filter functions as m
 
 ### Request lifecycle
 
-1. The frontend sends the message, active filters, selected IDs, audience, timezone, and a short conversation context.
-2. The backend checks request size and limits; Gemini interprets the intent and proposes tool calls.
+1. The frontend sends the message, audience/timezone, bounded history and a captured workspace: viewport, actual filters, selected IDs, originating panel/tab, ordered displayed results, layers and exact timeline range.
+2. The backend checks request size and limits; Gemini interprets the task in one bounded research/tool loop. Research scope can differ from screen filters. Clear display/navigation intent stages relevant validated actions without a command-word gate.
 3. Application code validates tool names/arguments and executes parameterized retrieval. Unsupported locations, metrics, dates, or IDs produce a controlled result rather than invented data.
 4. Retrieved records include source IDs, permitted excerpts, dates, units, and coverage. Numerical differences are computed by application/database code before explanation.
 5. Gemini composes a short answer from these records and proposes any supported UI actions.
@@ -252,13 +252,13 @@ For filtering requests, the action summary and result count can replace a length
 
 ### Context, freshness, and limitations
 
-“This area” means the selected location, or explicitly chosen map extent when nothing is selected. Ask a short clarification if the location is ambiguous. Resolve relative dates using the user's timezone and show the resulting range. News publication dates and observation periods remain separate.
+“Here” and “this area” mean the visible viewport when the question was submitted, even when an older story remains selected. “This story” uses the selected article; “these results” uses the ordered displayed IDs; conversational references use the ordered response ledger. New subjects replace unrelated research restrictions without changing screen filters unless display/navigation is requested. Ask a specific question only when ambiguity prevents useful progress. Short replies can resolve the one current pending clarification/proposal. Resolve relative dates using the user's timezone and show the resulting range. News publication dates and observation periods remain separate.
 
 Gemini is not the news provider and must not invent current reporting from model memory. When data is sparse, explain the coverage and offer a broader supported query. Separate reported facts, observed measurements, and research hypotheses; proximity alone does not prove impact or causality.
 
 ### Failure behavior
 
-Show pending, cancelled, unavailable, and quota-exhausted states with retry/manual options. Cancelled or older responses must not overwrite newer selections or apply stale actions. Manual controls remain functional. Prepared fallback answers are visibly labeled and do not count as live Gemini use. Do not retain chat history by default or include credentials in prompts/logs.
+Show pending, cancelled, unavailable, and quota-exhausted states with retry/manual options. Browsing preserves answers against their captured context; stale actions require explicit revalidation/application. Stop, New conversation, disconnect and deadlines cancel generation. Manual controls remain functional. Prepared fallback answers are visibly labeled and do not count as live Gemini use. Keep transcript text in browser memory for the visit; server continuation stores only six turns of references/scope and one expiring task. Do not persist chat history or include credentials in prompts/logs.
 
 ## 7. Data and content
 

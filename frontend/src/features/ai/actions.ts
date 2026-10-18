@@ -5,12 +5,15 @@ import type {
   InvestigationResponse,
   OpenTimelineArgs,
   UIActionV2,
+  UIActionV3,
+  AircraftState,
 } from "@atlas/contracts";
 import type { PreparedWorkspaceActions, WorkspaceState } from "../../app/state";
 import type { AtlasApi } from "../../lib/api";
 import { isSearchableBounds, normalizeNewsQuery } from "../../lib/api";
 import { locationOptions } from "../../lib/queries";
 import { readContract } from "../../lib/validation";
+import { GLOBAL_POSITION_TTL, POSITION_TTL } from '../../lib/flight-observations';
 
 export function validateRange(from?: string, to?: string) {
   if (
@@ -70,12 +73,14 @@ export async function resolveTimeline(
 export async function prepareActions(
   api: AtlasApi,
   client: QueryClient,
-  actions: readonly UIActionV2[],
+  actions: readonly (UIActionV2 | UIActionV3)[],
   snapshot: WorkspaceState,
   articles: readonly Article[],
   investigation: InvestigationResponse | undefined,
   signal: AbortSignal,
   label: AssistantResponseV2["resolved_range"] = null,
+  aircraft: readonly AircraftState[] = [],
+  resetSelectionOnFilters = false,
 ): Promise<PreparedWorkspaceActions> {
   const prepared: PreparedWorkspaceActions = {
     selection: { ...snapshot.selection },
@@ -113,9 +118,14 @@ export async function prepareActions(
   if (ids.some((id) => !locations.some((l) => l.id === id)))
     throw new Error("The assistant referenced an unavailable location.");
   for (const action of actions) {
-    readContract("UIActionV2", action);
-    if (action.type === "set_filters")
+    readContract("UIActionV3", action);
+    if (action.type === "set_filters") {
       prepared.filters = normalizeNewsQuery(structuredClone(action.filters));
+      if (resetSelectionOnFilters) {
+        prepared.selection = { articleId: null, locationId: null };
+        prepared.investigationId = null;
+      }
+    }
     if (action.type === "focus_location") {
       const place = locations.find((l) => l.id === action.location_id)!;
       if (place.bounds && !isSearchableBounds(place.bounds))
@@ -165,6 +175,37 @@ export async function prepareActions(
             : null,
       };
     }
+    if (action.type === 'open_record') {
+      if (action.record_type === 'article') {
+        const article = articles.find(row => row.id === action.id) ?? investigation?.articles.find(row => row.id === action.id)
+          ?? (api.article ? await client.fetchQuery({ queryKey: [api.mode, 'article', action.id], retry: false, queryFn: ({ signal: querySignal }) => api.article!(action.id, AbortSignal.any([signal, querySignal])) }) : null);
+        if (!article || readContract('Article', article).id !== action.id) throw new Error('The requested article is unavailable.');
+        client.setQueryData([api.mode, 'article', action.id], article);
+        prepared.selection = { articleId: article.id, locationId: article.location_ids.length === 1 ? article.location_ids[0]! : null };
+        prepared.investigationId = investigation?.investigation.article_ids.includes(article.id) ? investigation.investigation.id : null;
+        prepared.panel = { view: 'article', id: action.id };
+      } else if (action.record_type === 'investigation') {
+        if (!api.investigation) throw new Error('Investigations are unavailable.');
+        const data = readContract('InvestigationResponse', await client.fetchQuery({ queryKey: [api.mode, 'investigation', action.id], retry: false,
+          queryFn: ({ signal: querySignal }) => api.investigation!(action.id, AbortSignal.any([signal, querySignal])) }));
+        if (data.investigation.id !== action.id) throw new Error('The investigation has a different ID.');
+        prepared.investigationId = action.id;
+        prepared.selection = { articleId: null, locationId: data.investigation.primary_location_id };
+        prepared.panel = { view: 'investigation', id: action.id };
+      } else {
+        const item = aircraft.find(row => row.id === action.id);
+        if (!snapshot.flightsEnabled || !item || Date.now() - Date.parse(item.observed_at) > (item.provider === 'airlabs' ? GLOBAL_POSITION_TTL : POSITION_TTL)) throw new Error('This aircraft is no longer in the current displayed sample. Refresh the aircraft layer first.');
+        readContract('AircraftState', item);
+        prepared.aircraftId = item.id; prepared.panel = { view: 'aircraft', id: item.id };
+      }
+    }
+    if (action.type === 'set_basemap') prepared.basemap = action.basemap;
+    if (action.type === 'set_layers') {
+      if (action.wind === true && !api.wind) throw new Error('Wind is not connected.');
+      if (action.flights === true && !api.flightGlobal && !api.flightArea && !api.flights) throw new Error('Aircraft are not connected.');
+      prepared.layers = { ...prepared.layers, ...(action.flights === undefined ? {} : { flights: action.flights }), ...(action.wind === undefined ? {} : { wind: action.wind }) };
+    }
+    if (action.type === 'navigate_map') prepared.camera = action.command === 'globe' ? { type: 'return_to_globe' } : { type: 'zoom', delta: action.command === 'zoom_in' ? 1 : -1 };
   }
   if (
     prepared.timeline &&

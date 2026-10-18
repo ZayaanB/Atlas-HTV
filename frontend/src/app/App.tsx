@@ -7,10 +7,9 @@ import {
   useState,
   type ComponentType,
 } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Article, NewsResponse } from "@atlas/contracts";
 import type { AtlasApi } from "../lib/api";
-import { isSearchableBounds } from "../lib/api";
 import { useWorkspaceData } from "../lib/queries";
 import {
   useCatalog,
@@ -36,7 +35,6 @@ import {
 import { Icon } from "../components/Icon";
 import { Panel } from "../components/Panel";
 import {AudienceOnboarding} from '../components/AudienceOnboarding';
-import {AudienceSelect} from '../components/AudienceSelect';
 import { dateTime, publication, words } from "../lib/presentation";
 import { useWorkspace, type PanelView } from "./state";
 import type { AtlasMapProps, MapSelection } from "./map-interface";
@@ -100,13 +98,14 @@ export function App({
     [saveError, setSaveError] = useState(""),
     [overlay, setOverlay] = useState<EvidenceOverlay>(null),
     [flightRegion, setFlightRegion] = useState(""),
-    [flightsEnabled, setFlightsEnabled] = useState(false),
-    [windEnabled, setWindEnabled] = useState(false),
     [insets, setInsets] = useState({ top: 0, right: 0, bottom: 0, left: 0 });
   const layersRef = useRef<HTMLDivElement>(null),
     articles = news.data?.items ?? [],
     places = locations.data ?? [];
   const flightMode = resolveFlightMode(catalog.data);
+  const flightsEnabled = state.flightsEnabled, windEnabled = state.windEnabled;
+  const setFlightsEnabled = (value: boolean) => state.setLayer('flights', value);
+  const setWindEnabled = (value: boolean) => state.setLayer('wind', value);
   const areaEnabled = flightMode === 'area';
   const legacyFlights = flightMode === 'region';
   const flightAvailable = flightMode !== null;
@@ -129,14 +128,22 @@ export function App({
   }
   const wind = useWind(api, viewport, windEnabled);
   const selectedId = panel?.view === "article" ? panel.id : selection.articleId;
-  const selected =
+  const knownArticle =
     articles.find((a) => a.id === selectedId) ??
     research.data?.articles.find((a) => a.id === selectedId) ??
     client
       .getQueriesData<NewsResponse>({ queryKey: [api.mode, "news"] })
       .flatMap(([, data]) => data?.items ?? [])
       .find((a) => a.id === selectedId);
-  const assistant = useAssistantSession(api, articles, research.data);
+  const articleDetail = useQuery({ queryKey: [api.mode, 'article', selectedId],
+    enabled: !!selectedId && !knownArticle && !!api.article,
+    queryFn: ({ signal }) => api.article!(selectedId!, signal), retry: false });
+  const selected = knownArticle ?? articleDetail.data;
+  const assistant = useAssistantSession(api, articles, research.data, {
+    flightAvailable, flightMode, flightRegion, flightFetchedAt: flights.sample?.fetched_at ?? null,
+    flightStale: flights.stale, aircraft: flights.aircraft,
+    evidenceOverlay: overlay ? { id: overlay.evidence.id, opacity: overlay.opacity } : null,
+  });
   const pendingInvestigationFocus = useRef<string | null>(null);
   useEffect(() => {
     if (
@@ -381,8 +388,6 @@ export function App({
         </div>
         <header className="identity">
           <span className="brand"><span className="brand-wordmark">ATLAS</span></span>
-          <AudienceSelect />
-          {!state.audienceStorageAvailable && <span role="status" className="audience-storage-note">Preference kept for this visit only.</span>}
           {api.mode === 'fixture' && <button
             className="coverage-badge historical"
             onClick={() => state.openPanel({ view: "coverage" })}
@@ -562,27 +567,6 @@ export function App({
             </section>
           )}
         </div>
-        {viewport &&
-          viewport.userInitiated !== false &&
-          JSON.stringify(viewport.bounds) !==
-            JSON.stringify(filters.bounds) && (
-            <div className="area-search">
-              <button
-                disabled={!isSearchableBounds(viewport.bounds)}
-                title={
-                  !isSearchableBounds(viewport.bounds)
-                    ? "Move to a smaller area with supported bounds."
-                    : undefined
-                }
-                onClick={() => {
-                  state.searchArea();
-                  state.openPanel({ view: "news" }, true);
-                }}
-              >
-                Search this area
-              </button>
-            </div>
-          )}
         {windEnabled && <WindStatus wind={wind} onOpenLayers={() => setLayers(true)} />}
         {flightActive && (
           <button className="flight-status" onClick={() => setLayers(true)}>
@@ -895,7 +879,7 @@ export function App({
           <AssistantPanel
             session={assistant}
             fixture={api.mode === "fixture"}
-            connected={!!(api.assistant || api.assistantStream)}
+            connected={!!(api.assistantV3 || api.assistantStreamV3 || api.assistant || api.assistantStream)}
           />
         </div>
         <div hidden={panel?.view !== "investigation"}>

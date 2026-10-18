@@ -11,20 +11,26 @@ import { audienceContext } from './audience.js';
 import {modelParameters} from './schema.js';
 import {modelFailure} from './errors.js';
 import { CoreAssistant, requireV2Contracts } from './v2.js';
+import { WorkspaceAssistant, requireV3Contracts } from './v3.js';
+import { Conversations } from './conversations.js';
+import type { Wind } from '../wind.js';
 export class Assistant {
   private active = 0;
   private retryUntil=0;
-  constructor(private config: Config, private contracts: Contracts, private retrieval: Retrieval, private flights?: Flights, private model?: Model,private clock=Date.now, private diagnostic?: (event: Data) => void) {}
+  private sessions: Conversations;
+  constructor(private config: Config, private contracts: Contracts, private retrieval: Retrieval, private flights?: Flights, private model?: Model,private clock=Date.now, private diagnostic?: (event: Data) => void, private wind?: Wind) { this.sessions = new Conversations(clock); }
   async answer(raw: unknown, parent?: AbortSignal, progress?: (event: Data) => Promise<void>): Promise<Data> {
     checkAbort(parent);
+    const v3 = raw !== null && typeof raw === 'object' && !Array.isArray(raw) && (raw as Data).protocol_version === 3;
     const v2 = raw !== null && typeof raw === 'object' && !Array.isArray(raw) && (raw as Data).protocol_version === 2;
+    if (v3) requireV3Contracts(this.contracts);
     if (v2) requireV2Contracts(this.contracts);
-    const input = this.contracts.parse(v2 ? 'AssistantRequestV2' : 'AssistantRequest', raw);
-    for (const name of (v2 ? ['Citation'] : ['AssistantDraft','AssistantResponse','Citation',...(input.allow_ui_actions===true?['UIAction']:[])]))
+    const input = this.contracts.parse(v3 ? 'AssistantRequestV3' : v2 ? 'AssistantRequestV2' : 'AssistantRequest', raw);
+    for (const name of (v2 || v3 ? ['Citation'] : ['AssistantDraft','AssistantResponse','Citation',...(input.allow_ui_actions===true?['UIAction']:[])]))
       if (!this.contracts.has(name)) throw unavailable('CONTRACTS_UNAVAILABLE',`Shared schema ${name} has not been supplied`);
     audienceContext(input.audience);
-    if (Buffer.byteLength(JSON.stringify(input)) > (v2 ? 65536 : 24000) || (v2 ? [...string(input.message)].length : string(input.message).length) > 4000) throw new AppError('REQUEST_TOO_LARGE', 'Assistant request exceeds safety bound', 413);
-    if (v2 && (input.allow_ui_actions !== undefined || records(input.history).length > 12 || records(input.history).some(turn => [...string(turn.content)].length > 4000)))
+    if (Buffer.byteLength(JSON.stringify(input)) > (v2 || v3 ? 65536 : 24000) || (v2 || v3 ? [...string(input.message)].length : string(input.message).length) > 4000) throw new AppError('REQUEST_TOO_LARGE', 'Assistant request exceeds safety bound', 413);
+    if ((v2 || v3) && (input.allow_ui_actions !== undefined || records(input.history).length > 12 || records(input.history).some(turn => [...string(turn.content)].length > 4000)))
       throw new AppError('INVALID_INPUT', 'V2 uses bounded history and interaction_mode, not allow_ui_actions');
     if (this.active >= this.config.aiConcurrency) throw new AppError('ASSISTANT_BUSY', 'Assistant concurrency limit reached', 429, true);
     try { new Intl.DateTimeFormat('en', { timeZone: string(input.timezone) }); }
@@ -33,6 +39,13 @@ export class Assistant {
     this.active++;
     try {
       if (progress) await bounded(progress({ type: 'status', phase: 'reading' }), signal);
+      if (v3) {
+        const result = await bounded(new WorkspaceAssistant(this.config, this.contracts, this.retrieval, input,
+          this.clock() < this.retryUntil ? undefined : this.model, this.sessions, this.sessions.open(string(input.conversation_id)),
+          this.flights, this.wind, this.clock, progress, this.diagnostic).run(signal), signal);
+        if (records(result.errors).some(error => error.code === 'GEMINI_RATE_LIMITED')) this.retryUntil = this.clock() + 60000;
+        return result;
+      }
       return await bounded(v2 ? new CoreAssistant(this.config, this.contracts, this.retrieval, input, this.model,
         this.clock, this.clock() < this.retryUntil, () => { this.retryUntil = this.clock() + 60000; }, progress, this.diagnostic).run(signal) : this.run(input,signal), signal);
     }
@@ -64,13 +77,13 @@ export class Assistant {
     declarations.push({name:'respond',description:'Finish with an evidence-backed answer and source/record references. Never combine this with other calls in the same turn.',parametersJsonSchema:modelParameters(this.contracts,'AssistantDraft')});
     let calls = 0;
     try {
-      for (let round = 0; round < this.config.aiMaxRounds; round++) {
+      for (let round = 0; !this.config.aiMaxRounds || round < this.config.aiMaxRounds; round++) {
         checkAbort(signal);
         if (Buffer.byteLength(JSON.stringify(contents)) > this.config.aiMaxContextBytes) throw new AppError('CONTEXT_LIMIT', 'Retrieved evidence exceeded assistant context limit', 502);
         const turn = await bounded(this.model.generate(contents,declarations,signal),signal);
         checkAbort(signal);
         if (turn.calls.length) {
-          if (calls+turn.calls.length > this.config.aiMaxTools) throw new AppError('TOOL_LIMIT', 'Assistant tool limit reached', 502);
+          if (this.config.aiMaxTools && calls+turn.calls.length > this.config.aiMaxTools) throw new AppError('TOOL_LIMIT', 'Assistant tool limit reached', 502);
           if (turn.calls.some(call=>call.name==='respond')) {
             if (turn.calls.length!==1) throw new AppError('INVALID_MODEL_OUTPUT','Final response must be the only call in its turn',502);
             const draft=this.contracts.parse('AssistantDraft',turn.calls[0]!.args,true);
@@ -93,7 +106,7 @@ export class Assistant {
           contents.push({role:'user',parts});
           continue;
         }
-        const draft = this.contracts.parse('AssistantDraft',parseModelJson(turn.text),true);
+        const draft = this.contracts.parse('AssistantDraft',parseModelJson(turn.text,this.config.aiDemoMode ? 524288 : 16000),true);
         return await this.finish(input,draft,initial,ledger,tools,signal);
       }
       throw new AppError('TOOL_LIMIT','Assistant iteration limit reached',502);

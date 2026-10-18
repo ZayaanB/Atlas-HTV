@@ -38,7 +38,7 @@ export function modelParameters(contracts: Contracts,name: string): Data {
       // Gemini's grammar compiler can reject cumulative array maxima in rich
       // tool declarations. They are model hints only; the untouched authoritative
       // schema still enforces every array bound before dispatch/finalization.
-      if (['$schema','$id','$defs','definitions','$comment','additionalItems','maxItems'].includes(key)) continue;
+      if (['$schema','$id','$defs','definitions','$comment','additionalItems'].includes(key) || (key==='maxItems' && item!==0)) continue;
       if (['properties','patternProperties','dependentSchemas'].includes(key)) projected[key]=Object.fromEntries(Object.entries(object(item)).map(([property,child])=>[property,walk(child,base,next,depth+1)]));
       else if (['anyOf','oneOf','allOf'].includes(key) && Array.isArray(item)) projected[key]=item.map(child=>walk(child,base,next,depth+1));
       else if (key==='items' && Array.isArray(item)) {
@@ -51,4 +51,35 @@ export function modelParameters(contracts: Contracts,name: string): Data {
     return projected;
   }
   return object(walk(root,root,new Set()));
+}
+
+// Provider hints use Gemini's JSON Schema subset. The original contract still
+// validates every tool argument and final draft before anything is dispatched.
+// Apply this at the request boundary, after v2 has restricted its action union.
+export function geminiJsonSchema(value: unknown): Data {
+  function walk(value: unknown): unknown {
+    if (typeof value==='boolean') return value;
+    const schema=object(value), projected: Data={};
+    for (const key of ['type','title','description','enum','format','minimum','maximum','minItems','maxItems','propertyOrdering'])
+      if (schema[key]!==undefined) projected[key]=structuredClone(schema[key]);
+    if (!projected.type && Array.isArray(schema.enum)) {
+      const types=[...new Set(schema.enum.map(item=>item===null?'null':typeof item))];
+      if (types.every(type=>['string','number','boolean','null'].includes(type))) projected.type=types.length===1?types[0]:types;
+    }
+    if (schema.properties) projected.properties=Object.fromEntries(Object.entries(object(schema.properties)).map(([name,child])=>[name,walk(child)]));
+    if (schema.required) projected.required=structuredClone(schema.required);
+    if (schema.additionalProperties!==undefined) projected.additionalProperties=walk(schema.additionalProperties);
+    if (schema.maxItems===0) {
+      // No element can occur: do not ask the grammar compiler to expand a large
+      // action union for the final draft's necessarily empty actions array.
+      projected.items={type:'null'};
+    } else {
+      if (schema.items!==undefined) projected.items=walk(schema.items);
+      if (Array.isArray(schema.prefixItems)) projected.prefixItems=schema.prefixItems.map(walk);
+    }
+    const alternatives=schema.anyOf ?? schema.oneOf;
+    if (Array.isArray(alternatives)) projected.anyOf=alternatives.map(walk);
+    return projected;
+  }
+  return object(walk(value));
 }

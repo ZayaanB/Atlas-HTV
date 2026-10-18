@@ -20,7 +20,7 @@ beforeEach(() => {
     setItem: (k: string, v: string) => storage.set(k, v),
   });
 });
-function mount(api: AtlasApi = createFixtureApi()) {
+function mount(api: AtlasApi = createFixtureApi(2)) {
   const client = createQueryClient();
   client.setDefaultOptions({ queries: { retry: false } });
   return render(
@@ -74,7 +74,7 @@ it("opens real research, persists a save, and exposes dated evidence and sources
   ).toHaveAttribute("href", expect.stringContaining("science.nasa.gov"));
 });
 it("changes investigation emphasis while retaining every supplied fact and the active filters", async () => {
-  const api = createFixtureApi(),
+  const api = createFixtureApi(2),
     user = userEvent.setup();
   const data = await api.investigation!(
     "inv-helene-asheville-2024",
@@ -100,7 +100,7 @@ it("changes investigation emphasis while retaining every supplied fact and the a
 });
 it("rejects stale assistant actions after filters change", async () => {
   const user = userEvent.setup(),
-    fixture = createFixtureApi();
+    fixture = createFixtureApi(2);
   let respond!: (r: AssistantResponseV2) => void;
   let requestId = "";
   const api: AtlasApi = {
@@ -159,7 +159,7 @@ it("rejects unsafe asset paths and fits global home zoom to the available viewpo
 
 it("accepts an answer without required inline references and applies its valid filter action", async () => {
   const user = userEvent.setup(),
-    fixture = createFixtureApi();
+    fixture = createFixtureApi(2);
   const api: AtlasApi = {
     ...fixture,
     assistant: async (request, signal) => {

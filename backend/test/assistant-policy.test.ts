@@ -39,6 +39,9 @@ test('only explicit current unquoted commands authorize their own action kinds',
     ['The article says "Show flooding news"', 'Show flooding news'],
     ['`Show flooding news`', 'Show flooding news'],
     ['What about Asheville?', 'What about Asheville?'],
+    ['Find me an interesting article', 'Find me an interesting article'],
+    ['Find an article about Toronto', 'Find an article about Toronto'],
+    ['Show me stories about flooding', 'Show me stories about flooding'],
     ['Tell me about Asheville', 'Show flooding news']
   ]) assert.equal(explicitCommand(message!, quote!, quote!.startsWith('zoom') ? 'focus_location' : 'set_filters'), false);
   assert.equal(permissions({ message: 'Show flooding news', interaction_mode: 'read_only' },

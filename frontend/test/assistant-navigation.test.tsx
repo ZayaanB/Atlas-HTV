@@ -68,7 +68,7 @@ async function send(message: string) {
 it("explicit actions preserve filters/chat, clear an inactive aircraft highlight, and reopen the investigation with a fresh series/range", async () => {
   useWorkspace.getState().applyFilters({ themes: ["flooding"] });
   useWorkspace.getState().selectAircraft("aircraft-independent");
-  const fixture = createFixtureApi(),
+  const fixture = createFixtureApi(2),
     requests: AssistantRequestV2[] = [],
     queries: ObservationsQuery[] = [];
   const next = {
@@ -137,7 +137,7 @@ it("explicit actions preserve filters/chat, clear an inactive aircraft highlight
 });
 it("chart failure follows valid navigation without rolling back the accepted action batch", async () => {
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) =>
       status(r, {
         actions: [
@@ -161,7 +161,7 @@ it("keeps oversized answers fully visible while omitting that exchange from subs
     answer = "Long stored synthetic answer ".repeat(200) + "[1]";
   const source = data.sources[0]!;
   mount({
-    ...createFixtureApi(),
+    ...createFixtureApi(2),
     assistant: async (r) => {
       requests.push(r);
       return status(r, {

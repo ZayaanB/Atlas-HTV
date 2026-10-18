@@ -344,14 +344,6 @@ details[open] > summary {
   letter-spacing: 0.28em;
   margin-inline-end: -0.28em;
 }
-.identity .audience-select { pointer-events: auto; margin: 0; gap: 3px; }
-.identity .audience-select > span { color: #d9e3ef; font-size: 11px; }
-.identity .audience-select select {
-  max-width: 220px; min-height: 34px; padding: 5px 10px;
-  color: #f2f3f5; background: #080d15eb; border: 1px solid #ffffff30;
-  border-radius: 9px; font-size: 12px;
-}
-.audience-storage-note { max-width: 220px; font-size: 11px; color: #d6c5a3; }
 .audience-onboarding {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
@@ -513,20 +505,6 @@ details[open] > summary {
   border: 1px solid var(--accent);
   background: #74b9ff20;
   flex: none;
-}
-.area-search {
-  position: absolute;
-  top: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-}
-.area-search button {
-  min-height: 34px;
-  padding: 7px 15px;
-  border-radius: 30px;
-  background: #11151b;
-  font-size: 12px;
 }
 .workspace-notice {
   position: absolute;
@@ -1135,6 +1113,15 @@ th {
 .assistant-context {
   margin: 0 0 20px;
 }
+.assistant-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-block: 12px;
+}
+.assistant-choices > button {
+  min-height: 44px;
+}
 .coordinate-readout {
   font-variant-numeric: tabular-nums;
   font-size: 18px;
@@ -1206,9 +1193,6 @@ th {
     width: min(320px, calc(100vw - 36px));
     max-height: 60dvh;
   }
-  .area-search {
-    top: 90px;
-  }
   .flight-status {
     bottom: 82px;
     left: 20px;
@@ -1218,9 +1202,6 @@ th {
   }
   .wind-status { left: 20px; bottom: 125px; }
   .has-panel .wind-status { display: none; }
-  .has-panel .area-search {
-    display: none;
-  }
   .workspace-notice {
     top: 120px;
     left: 24px;
@@ -1251,9 +1232,6 @@ th {
   }
   .panel-body {
     padding-inline: 20px;
-  }
-  .area-search {
-    top: 108px;
   }
   .article-title {
     font-size: 24px;

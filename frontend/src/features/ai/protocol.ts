@@ -2,6 +2,8 @@ import type {
   AssistantRequestV2,
   AssistantResponseV2,
   AssistantStreamEvent,
+  AssistantRequestV3,
+  AssistantResponseV3,
 } from "@atlas/contracts";
 import { readContract } from "../../lib/validation";
 
@@ -9,7 +11,12 @@ export interface Exchange {
   id: string;
   question: string;
   status: "pending" | "complete" | "failed" | "cancelled";
-  response?: AssistantResponseV2;
+  response?: AssistantResponseV2 | AssistantResponseV3;
+  contextLabel?: string;
+  actionsState?: 'applied' | 'stale' | 'failed';
+  acceptedRevision?: number;
+  contextMoved?: boolean;
+  actionError?: string | undefined;
   error?: {
     message: string;
     code: string;
@@ -23,15 +30,15 @@ export interface Exchange {
 const bytes = (value: unknown) =>
   new TextEncoder().encode(JSON.stringify(value)).byteLength;
 /** Retain a contiguous suffix of whole eligible exchanges. Stored text is never edited. */
-export function packHistory(
-  base: AssistantRequestV2,
+export function packHistory<T extends AssistantRequestV2 | AssistantRequestV3>(
+  base: T,
   exchanges: readonly Exchange[],
 ) {
   const request = {
     ...base,
     history: [] as NonNullable<AssistantRequestV2["history"]>,
   };
-  readContract("AssistantRequestV2", request);
+  readContract(base.protocol_version === 3 ? 'AssistantRequestV3' : 'AssistantRequestV2', request);
   if (bytes(request) > 65536)
     throw new Error(
       "Shorten the question or simplify its context; the request exceeds 65,536 bytes.",
@@ -57,11 +64,11 @@ export function packHistory(
     request.history = candidate.history;
     included++;
   }
-  readContract("AssistantRequestV2", request);
+  readContract(base.protocol_version === 3 ? 'AssistantRequestV3' : 'AssistantRequestV2', request);
   return { request, omitted: included < eligible.length };
 }
 export function validateAnswer(
-  response: AssistantResponseV2,
+  response: AssistantResponseV2 | AssistantResponseV3,
 ) {
   if (
     (response.mode === "fallback" || response.kind === "clarification") &&

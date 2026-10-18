@@ -6,7 +6,7 @@ import type { ModelOptions } from './client.js';
 import { modelRequestBytes } from './request.js';
 
 export const TOOL_BYTES = 8000;
-export const WORKING_BYTES = 48000;
+export const HISTORY_BYTES = 24000;
 export const byteLength = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
 export function historyPairs(history: unknown): Data[] {
   const turns = records(history), pairs: Data[] = [];
@@ -19,8 +19,8 @@ export function historyPairs(history: unknown): Data[] {
 }
 export function initialHistory(history: unknown): Data[] {
   const chosen: Data[] = [];
-  for (const pair of historyPairs(history).slice(0, 2)) {
-    if (byteLength([...chosen, pair]) > 4000) break;
+  for (const pair of historyPairs(history).slice(0, 6)) {
+    if (byteLength([...chosen, pair]) > HISTORY_BYTES) break;
     chosen.push(pair);
   }
   return chosen.reverse();
@@ -42,7 +42,7 @@ export class PromptBudget {
   readonly limit: number;
   evictions = 0;
   historyOmitted = false;
-  constructor(private config: Config) { this.limit = Math.min(WORKING_BYTES, config.aiMaxContextBytes); }
+  constructor(private config: Config) { this.limit = config.aiMaxContextBytes; }
   fit(base: Data, blocks: ResearchBlock[], declarations: FunctionDeclaration[], options?: ModelOptions) {
     const root = structuredClone(base);
     const content = (): Content[] => [{ role: 'user', parts: [{ text: JSON.stringify(root) }] }, ...blocks.flatMap(block => block.contents)];
@@ -59,7 +59,9 @@ export class PromptBudget {
     }
     if (modelRequestBytes(this.config, contents, declarations, options) > this.limit) {
       const request = object(root.request);
-      if (records(request.history).length) { request.history = []; this.historyOmitted = true; contents = content(); }
+      while (records(request.history).length && modelRequestBytes(this.config, contents, declarations, options) > this.limit) {
+        request.history = records(request.history).slice(1); this.historyOmitted = true; contents = content();
+      }
     }
     const bytes = modelRequestBytes(this.config, contents, declarations, options);
     if (bytes > this.limit) throw new AppError('REQUEST_TOO_LARGE', 'The question and required tool instructions cannot fit the research budget. Shorten the question.', 413);
