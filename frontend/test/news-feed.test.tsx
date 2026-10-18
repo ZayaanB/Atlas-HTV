@@ -1,0 +1,31 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { expect, it, vi } from 'vitest';
+import examples from '@atlas/contracts/examples/helene-api.json';
+import { readContract } from '../src/lib/validation';
+import { NewsFeed } from '../src/features/feed/NewsFeed';
+
+const articles = readContract('NewsResponse', examples.news).items.slice(0, 2);
+it('keeps details collapsed and expands only one article at a time without navigating', async () => {
+  const user = userEvent.setup(), onSelect = vi.fn();
+  render(<NewsFeed articles={articles} selectedId={null} onSelect={onSelect} />);
+  expect(screen.queryByRole('link', { name: /Read original source/ })).not.toBeInTheDocument();
+  const first = screen.getByRole('button', { name: articles[0]!.title });
+  const second = screen.getByRole('button', { name: articles[1]!.title });
+  expect(first).toHaveAttribute('aria-expanded', 'false');
+  await user.click(first);
+  expect(first).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getAllByRole('link', { name: /Read original source/ })).toHaveLength(1);
+  expect(onSelect).not.toHaveBeenCalled();
+  await user.click(second);
+  expect(first).toHaveAttribute('aria-expanded', 'false');
+  expect(second).toHaveAttribute('aria-expanded', 'true');
+  const details = screen.getByRole('region', { name: articles[1]!.title });
+  expect(within(details).getByRole('link', { name: /Read original source/ })).toHaveAttribute('href', articles[1]!.url);
+  await user.click(within(details).getByRole('button', { name: 'Open article' }));
+  expect(onSelect).toHaveBeenCalledWith(articles[1]);
+  second.focus();
+  await user.keyboard('{Enter}');
+  expect(second).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('link', { name: /Read original source/ })).not.toBeInTheDocument();
+});

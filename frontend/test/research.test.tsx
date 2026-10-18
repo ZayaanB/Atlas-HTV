@@ -51,6 +51,7 @@ it("opens real research, persists a save, and exposes dated evidence and sources
       name: "Flash Floods Swamp North Carolina",
     }),
   );
+  await user.click(screen.getByRole("button", { name: "Open article" }));
   await user.click(
     await screen.findByRole("button", { name: /Open investigation/ }),
   );
@@ -203,11 +204,13 @@ it("restores the selected article when navigating Back through related reporting
       name: "Flash Floods Swamp North Carolina",
     }),
   );
+  await user.click(screen.getByRole("button", { name: "Open article" }));
   await user.click(
     screen.getByRole("button", {
       name: "USGS is collecting flood data and repairing streamgages damaged by Hurricane Helene",
     }),
   );
+  await user.click(screen.getByRole("button", { name: "Open article" }));
   expect(useWorkspace.getState().selection.articleId).toBe(
     "art-usgs-news-helene-streamgages",
   );

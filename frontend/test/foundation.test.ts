@@ -15,6 +15,10 @@ describe('HTTP and shared contracts', () => {
     expect(a).toEqual(b);
     expect(new URLSearchParams(serializeQuery({ ...a, bounds: [-83, 35, -82, 36] })).get('bounds')).toBe('-83,35,-82,36');
     expect(serializeQuery(a)).toContain('location_ids=loc-a%2Cloc-b');
+    const categories = normalizeNewsQuery({event_types:['flood','earthquake','flood'],topics:['science','health'],has_location:false});
+    expect(categories.event_types).toEqual(['earthquake','flood']);
+    expect(new URLSearchParams(serializeQuery(categories)).get('has_location')).toBe('false');
+    expect(normalizeNewsQuery({event_types:[],topics:[]})).toEqual({limit:50,offset:0});
     expect(() => normalizeNewsQuery({ bounds: [170, -10, -170, 10] })).toThrow();
   });
   it('passes cancellation to fetch and validates incoming payloads', async () => {

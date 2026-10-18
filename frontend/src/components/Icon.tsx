@@ -13,6 +13,9 @@ export type IconName =
   | "spark"
   | "expand"
   | "collapse"
+  | "chevron"
+  | "fullscreen"
+  | "restore"
   | "info";
 const paths: Record<IconName, string> = {
   search: "M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
@@ -30,6 +33,9 @@ const paths: Record<IconName, string> = {
   spark: "M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z",
   expand: "M5 9l7-7 7 7M5 21l7-7 7 7",
   collapse: "M5 3l7 7 7-7M5 15l7 7 7-7",
+  chevron: "M6 9l6 6 6-6",
+  fullscreen: "M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5",
+  restore: "M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3",
   info: "M12 11v6M12 7h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
 };
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {

@@ -65,6 +65,7 @@ curl -i http://127.0.0.1:3001/api/health/live
 curl -i http://127.0.0.1:3001/api/health
 # After the shared schemas, verified IDs, and database handoff exist:
 curl 'http://127.0.0.1:3001/api/news?location_ids=KNOWN_LOCATION_ID&limit=20'
+curl 'http://127.0.0.1:3001/api/news?event_types=flood,drought&topics=environment&has_location=true&verification_status=unreviewed&limit=20&offset=0'
 curl 'http://127.0.0.1:3001/api/locations?query=PLACE_NAME'
 curl 'http://127.0.0.1:3001/api/investigations/KNOWN_INVESTIGATION_ID'
 curl 'http://127.0.0.1:3001/api/observations?location_id=KNOWN_LOCATION_ID&metric=KNOWN_METRIC&observed_from=2026-01-01T00:00:00Z&observed_to=2026-02-01T00:00:00Z'
@@ -80,6 +81,10 @@ The generic identifiers above are placeholders. This checkout supports `location
 ```json
 {"status":"ready","contracts":true,"database":true,"query_plans":true,"data_mode":"stored"}
 ```
+
+News category filters use the authoritative `contracts` export `newsFiltering`: existing tags or whole English headline/excerpt terms, OR within each event/topic group and AND across fields. They are approximate discovery rules, not reviewed classifications or newly generated facts. `verification_status` filters the stored review field; `has_location` tests linked location IDs and does not infer coordinates. `backend/src/data/news-filters.ts` adds parameterized predicates on the agreed `atlas.article_records` view before the frozen handoff's keyword/semantic ranking and pagination. No migration or Person 4 SQL changes are required. An incompatible handoff fails explicitly instead of filtering only the returned page.
+
+After pulling these changes, rebuild contracts and backend, then restart the backend (`npm --prefix contracts run build`, `npm --prefix backend run build`, `npm --prefix backend start`). These filters apply equally to manual requests and Gemini tools; read-only tools cannot replace active event/topic/provenance constraints. Backend tests require the built shared contracts and include filter parity, strict GET values, action rejection, bound SQL values and pagination-adapter checks.
 
 The consistent operational error envelope is:
 

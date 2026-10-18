@@ -79,8 +79,8 @@ it("keeps current-page map/feed IDs together through pagination, empty pages, an
   await user.click(screen.getByRole("button", { name: "Open news" }));
   expect(
     within(screen.getByRole("region", { name: "News feed" })).getAllByRole(
-      "link",
-      { name: /Read original source/ },
+      "heading",
+      { level: 3 },
     ),
   ).toHaveLength(2);
   await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -145,6 +145,7 @@ it("shares selection with map events and emits sourced camera commands from feed
     ),
   )!;
   await user.click(screen.getByRole("button", { name: article.title }));
+  await user.click(screen.getByRole("button", { name: "Open article" }));
   expect(mapProps.selection.articleId).toBe(article.id);
   const location = mapProps.locations.find(
     (l) => l.id === mapProps.selection.locationId,
@@ -158,6 +159,68 @@ it("shares selection with map events and emits sourced camera commands from feed
     mapProps.onSelect({ articleId: "unknown-record", locationId: null }),
   );
   expect(useWorkspace.getState().selection.articleId).toBe(article.id);
+});
+
+it("opens news fullscreen, restores it with Escape, and resets fullscreen after closing", async () => {
+  const user = userEvent.setup();
+  mount(createFixtureApi());
+  await user.click(screen.getByRole("button", { name: "Open news" }));
+  await user.click(screen.getByRole("button", { name: "Fullscreen news" }));
+  expect(screen.getByRole("dialog", { name: "News" })).toHaveClass("is-fullscreen");
+  expect(screen.getByRole("dialog", { name: "News" })).toHaveAttribute("aria-modal", "true");
+  expect(screen.getByLabelText("Test map").closest(".workspace-canvas")).toHaveAttribute("inert");
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("complementary", { name: "News" })).not.toHaveClass("is-fullscreen");
+  expect(screen.getByLabelText("Test map").closest(".workspace-canvas")).not.toHaveAttribute("inert");
+  await user.click(screen.getByRole("button", { name: "Fullscreen news" }));
+  await user.click(screen.getByRole("button", { name: "Close panel" }));
+  await user.click(screen.getByRole("button", { name: "Open news" }));
+  expect(screen.getByRole("complementary", { name: "News" })).not.toHaveClass("is-fullscreen");
+});
+
+it("shares event/topic filters between News and Search and resets pagination for new constraints", async () => {
+  const user = userEvent.setup(), api = createFixtureApi();
+  const spy = vi.spyOn(api, 'news');
+  useWorkspace.getState().applyFilters({limit:2});
+  mount(api);
+  await waitFor(() => expect(mapProps.articles).toHaveLength(2));
+  await user.click(screen.getByRole('button',{name:'Open news'}));
+  await user.click(screen.getByRole('button',{name:'Next page'}));
+  await waitFor(() => expect(useWorkspace.getState().filters.offset).toBe(2));
+  await user.click(screen.getByRole('button',{name:'Filters'}));
+  await user.click(screen.getByRole('checkbox',{name:'Floods'}));
+  await user.click(screen.getByRole('checkbox',{name:'Health'}));
+  await user.click(screen.getByRole('button',{name:'Apply filters'}));
+  await waitFor(() => expect(spy.mock.lastCall?.[0]).toMatchObject({event_types:['flood'],topics:['health'],offset:0}));
+  await waitFor(() => expect(mapProps.articles.length).toBeGreaterThan(0));
+  expect(mapProps.articles.every(a => a.themes.includes('drinking-water'))).toBe(true);
+  await user.click(screen.getByRole('button',{name:'Open search'}));
+  expect(screen.getByRole('checkbox',{name:'Floods'})).toBeChecked();
+  expect(screen.getByRole('checkbox',{name:'Health'})).toBeChecked();
+  await user.click(screen.getByRole('button',{name:'Remove topics filter'}));
+  await waitFor(() => expect(useWorkspace.getState().filters.topics).toBeUndefined());
+  expect(useWorkspace.getState().filters.event_types).toEqual(['flood']);
+  await user.click(screen.getByRole('button',{name:'Clear filters'}));
+  await waitFor(() => expect(useWorkspace.getState().filters).toEqual({limit:2,offset:0}));
+});
+
+it("applies publication presets, provenance and location availability from Search",async()=>{
+  const user = userEvent.setup();
+  mount(createFixtureApi());
+  await user.click(screen.getByRole('button',{name:'Open search'}));
+  await user.click(screen.getByText('Refine reporting'));
+  await user.selectOptions(screen.getByRole('combobox',{name:'Quick period'}),'7');
+  expect(screen.getByRole('combobox',{name:'Quick period'})).toHaveValue('7');
+  await user.selectOptions(screen.getByRole('combobox',{name:'Review status'}),'unreviewed');
+  await user.selectOptions(screen.getByRole('combobox',{name:'Location availability'}),'false');
+  await user.selectOptions(screen.getByRole('combobox',{name:'Stories per page'}),'20');
+  await user.click(screen.getByRole('button',{name:'Apply filters'}));
+  expect(useWorkspace.getState().filters).toMatchObject({verification_status:'unreviewed',has_location:false,limit:20,offset:0});
+  const {published_from:from,published_to:to} = useWorkspace.getState().filters;
+  expect(from).toMatch(/T00:00:00.000Z$/);
+  expect(to).toMatch(/T23:59:59.999Z$/);
+  expect(Date.parse(to!) - Date.parse(from!)).toBe(7*86400000-1);
+  await screen.findByText(/No articles returned on this page/);
 });
 
 it("discards old results when an adapter ignores cancellation", async () => {

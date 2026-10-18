@@ -27,6 +27,8 @@ export class Retrieval {
   newsInput(raw: unknown): Data {
     const query = this.contracts.parse('NewsQuery', raw);
     range(query, 'published_from', 'published_to'); bounds(query.bounds); page(query);
+    if (['event_types','topics','verification_status','has_location'].some(key => query[key] !== undefined) && !this.contracts.newsFiltering)
+      throw new AppError('CONTRACTS_UNAVAILABLE', 'Rebuild shared contracts to enable category and provenance filters',503);
     return query;
   }
   async news(raw: unknown, signal?: AbortSignal): Promise<Data> {
@@ -42,7 +44,8 @@ export class Retrieval {
     // Keyword fallback uses the semantic query as the literal search term.
     const effective = searchMode === 'keyword_fallback' && !query.keyword ? { ...query, keyword: query.semantic_query } : query;
     const rows = ranked ?? await this.repository.read('news', { ...effective, ...pagination }, signal);
-    const candidates = rows.map(row => this.contracts.parse('Article', row, true)).filter(row => matchesNews(row, effective));
+    const candidates = rows.map(row => this.contracts.parse('Article', row, true)).filter(row => matchesNews(row, effective) &&
+      (!this.contracts.newsFiltering || this.contracts.newsFiltering.matches(row,effective)));
     let items = candidates;
     if (query.bounds) {
       const [w,s,e,n] = bounds(query.bounds)! as [number,number,number,number];

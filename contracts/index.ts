@@ -1,6 +1,7 @@
 import { featureSchemas, type FeatureContracts } from "./schemas/workspace.js";
 import type { FromSchema } from "json-schema-to-ts";
 import { newsQuerySchema } from "./schemas/api.js";
+export {newsCategories, newsFiltering, matchesNewsCategories} from './schemas/news-categories.js';
 import {
   articleSchema,
   locationSchema,

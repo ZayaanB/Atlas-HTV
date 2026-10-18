@@ -1,5 +1,6 @@
 import examples from "@atlas/contracts/examples/helene-api.json";
 import type { Article, Location, NewsQuery } from "@atlas/contracts";
+import { matchesNewsCategories } from "@atlas/contracts";
 import type { AtlasApi } from "./api";
 import { normalizeNewsQuery } from "./api";
 import { readContract } from "./validation";
@@ -24,6 +25,7 @@ function within(
   );
 }
 function matches(article: Article, query: NewsQuery): boolean {
+  if (!matchesNewsCategories(article, query)) return false;
   for (const key of ["location_ids", "themes", "entity_ids"] as const) {
     if (
       query[key]?.length &&
