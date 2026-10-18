@@ -36,6 +36,8 @@ function mount(element: React.ReactNode) {
 }
 beforeEach(() => useWorkspace.setState(useWorkspace.getInitialState(), true));
 
+// This multi-step flow includes navigation, typing, raw pagination and table
+// accessibility queries. Keep its five-second data wait inside a larger flow budget.
 it("opens investigation by ID and pages the existing HTTP timeline without workspace discovery", async () => {
   const fixture = createFixtureApi(),
     observationQueries: ObservationsQuery[] = [];
@@ -132,7 +134,7 @@ it("opens investigation by ID and pages the existing HTTP timeline without works
     within(table).getByRole("columnheader", { name: "Fetched · UTC" }),
   ).toBeInTheDocument();
   expect(within(table).getAllByRole("row")).toHaveLength(101);
-});
+}, 15000);
 
 it("aborts an old observation range and discards its late response", async () => {
   const fixture = createFixtureApi();

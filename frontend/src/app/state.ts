@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Location, NewsQuery } from "@atlas/contracts";
 import { isSearchableBounds, normalizeNewsQuery } from "../lib/api";
+import {isAudience, readAudiencePreference, writeAudiencePreference, type Audience} from './audience';
 import type {
   BasemapPreference,
   CameraCommand,
@@ -29,6 +30,10 @@ export interface PanelRoute {
   id?: string | undefined;
 }
 interface WorkspaceState {
+  audience: Audience;
+  onboardingComplete: boolean;
+  audienceStorageAvailable: boolean;
+  setAudience: (audience: Audience) => void;
   panel: PanelRoute | null;
   panelHistory: PanelRoute[];
   sheetExpanded: boolean;
@@ -62,6 +67,11 @@ interface WorkspaceState {
 /** Factory gives each test/workspace independent state. No server data is persisted. */
 export function createWorkspaceStore() {
   return create<WorkspaceState>((set, get) => ({
+    ...readAudiencePreference(),
+    setAudience: (audience) => {
+      if (!isAudience(audience)) return;
+      set({audience,onboardingComplete:true,audienceStorageAvailable:writeAudiencePreference(audience)});
+    },
     panel: null,
     panelHistory: [],
     sheetExpanded: false,
