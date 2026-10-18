@@ -442,9 +442,10 @@ export function AtlasMap(props: AtlasMapProps) {
       map.setFog({
         color: "#131b2a",
         "high-color": "#172a46",
+        // Keep space opaque: transparency exposes the atmosphere's circular edge.
         "space-color": "#07090d",
         "horizon-blend": 0.06,
-        "star-intensity": 0.12,
+        "star-intensity": 0.3,
       });
       installLocationLayers(map, dataRef.current);
       updateEvidence(map, propsRef.current.evidenceOverlay);
