@@ -8,6 +8,8 @@ addFormats(ajv);
 for (const [name, schema] of Object.entries(schemas)) ajv.addSchema(schema, name);
 
 export function readContract<Name extends SchemaName>(name: Name, value: unknown): Contract<Name> {
-  if (!ajv.getSchema(name)!(value)) throw new Error(`Invalid ${name}`);
+  const validate = ajv.getSchema(name);
+  if (!validate) throw new Error(`Unknown contract schema ${name}; rebuild contracts (npm run build in contracts/)`);
+  if (!validate(value)) throw new Error(`Invalid ${name}`);
   return value as Contract<Name>;
 }
