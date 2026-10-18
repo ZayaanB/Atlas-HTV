@@ -4,6 +4,7 @@ import type {
   Coverage,
   Evidence,
   Location,
+  WindSample,
 } from "@atlas/contracts";
 
 export type Coordinates = NonNullable<Location["coordinates"]>;
@@ -38,6 +39,7 @@ export interface AtlasMapProps {
   evidenceOverlay?: { evidence: Evidence; url: string; opacity: number } | null;
   aircraft?: readonly AircraftState[];
   selectedAircraftId?: string | null;
+  windSamples?: readonly WindSample[];
   onSelectAircraft?: (id: string) => void;
   articles: readonly Article[];
   locations: readonly Location[];

@@ -545,6 +545,22 @@ details[open] > summary {
   border-radius: 20px;
   padding: 5px 12px;
 }
+.wind-status {
+  position: absolute;
+  left: 30px;
+  bottom: 135px;
+  z-index: 3;
+  width: min(300px, calc(100vw - 60px));
+  padding: 12px 14px;
+  border: 1px solid #ffffff18;
+  border-radius: 14px;
+  background: #0c1018ed;
+  color: #c6d2de;
+  font-size: 11px;
+}
+.wind-status p { margin: 5px 0 0; }
+.wind-status button { font-size: 12px; }
+.wind-status a { color: #a7d5ff; }
 .content-panel {
   position: absolute;
   z-index: 6;
@@ -1182,6 +1198,8 @@ th {
   .has-panel .flight-status {
     display: none;
   }
+  .wind-status { left: 20px; bottom: 125px; }
+  .has-panel .wind-status { display: none; }
   .has-panel .area-search {
     display: none;
   }

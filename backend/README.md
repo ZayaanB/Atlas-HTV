@@ -44,6 +44,14 @@ The explicit `setup:tiger` command connects to an existing READY DEV service usi
 
 ## What is implemented
 
+Wind is available through `GET /api/wind?bounds=west,south,east,north`, independent of the news database and Gemini. Rebuild shared contracts and restart the backend after pulling this addition. `WIND_ENABLED=false` disables provider access; the UI toggle defaults off, and neither startup nor tests fetch wind automatically.
+
+The fixed Open-Meteo forecast endpoint supplies current modelled wind at 10 m in km/h and meteorological **from** degrees. Each request samples nine points in the supplied view, supports antimeridian bounds, preserves requested and provider grid coordinates separately, and returns UTC model-valid and fetch times. Missing speeds are omitted; missing directions remain null. This is coarse model context, not street-level measurements or dated event evidence.
+
+The memory cache coalesces viewers, refreshes on demand after 15 minutes, marks cached/failing data stale, and expires it after an hour. A shared 10-second gate, rolling 4,500-location/hour and 9,000-location/day budgets, 64-view cache bound, timeout, body-size bound and provider Retry-After/backoff limit usage. Each batched location counts toward the budget. No background requests start without viewers; an already-started shared request can finish after a client disconnects. One backend process owns these budgets; multiple processes require a shared limiter before deployment.
+
+Source and licensing: [Open-Meteo forecast docs](https://open-meteo.com/en/docs), [CC BY 4.0 attribution](https://open-meteo.com/en/licence), [free non-commercial service terms and limits](https://open-meteo.com/en/terms). No API key is needed for the non-commercial prototype. Commercial use requires a separately reviewed provider arrangement; no subscription or deployment is configured here.
+
 | Area | Behavior | External dependency |
 | --- | --- | --- |
 | Health | `/api/health/live` is process liveness; `/api/health` checks contracts, core query-plan availability, repository mode and database connectivity | Full contracts, core plans and configured database for readiness |

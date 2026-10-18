@@ -49,6 +49,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     aiMaxContextBytes: integer('AI_MAX_CONTEXT_BYTES', 64000, 4000, 128000),
     aiMaxOutputTokens: integer('AI_MAX_OUTPUT_TOKENS', 8192, 512, 16384),
     flightsEnabled: flag('FLIGHTS_ENABLED'),
+    windEnabled: env.WIND_ENABLED === undefined ? true : flag('WIND_ENABLED'),
     flightsRefreshMs: integer('FLIGHTS_REFRESH_INTERVAL_MS', 60000, 30000, 3600000),
     flightsStaleMs: integer('FLIGHTS_STALE_AFTER_MS', 120000, 1000, 3600000),
     flightsExpireMs: integer('FLIGHTS_CACHE_TTL_MS', 300000, 1000, 3600000),
