@@ -1,0 +1,15 @@
+# Atlas auto-deploy timer (Person 4). Install as /etc/systemd/system/atlas-deploy.timer, then
+#   systemctl daemon-reload && systemctl enable --now atlas-deploy.timer
+# Checks origin/main every 5 minutes; each check is one `git fetch`. Updates touching db/migrations are held for a
+# supervised deploy, and a commit that failed to build or start is rolled back and not retried.
+[Unit]
+Description=Check origin/main for Atlas updates every 5 minutes
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Unit=atlas-deploy.service
+
+[Install]
+WantedBy=timers.target
