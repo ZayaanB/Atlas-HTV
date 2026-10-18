@@ -443,7 +443,7 @@ details[open] > summary {
 }
 .map-controls {
   position: absolute;
-  bottom: 28px;
+  bottom: 44px;
   left: 30px;
   z-index: 7;
 }
@@ -1169,7 +1169,7 @@ th {
   }
   .map-controls {
     left: 18px;
-    bottom: calc(26px + env(safe-area-inset-bottom));
+    bottom: calc(44px + env(safe-area-inset-bottom));
   }
   .map-control-capsule .icon-button {
     width: 36px;
@@ -1295,6 +1295,7 @@ th {
   }
   .map-controls {
     left: 12px;
+    bottom: calc(92px + env(safe-area-inset-bottom));
   }
   .map-control-capsule > .icon-button:first-child {
     display: none;
@@ -1303,6 +1304,9 @@ th {
 .workspace-canvas {
   position: absolute;
   inset: 0;
+}
+@media (max-width: 600px) {
+  .map-controls { bottom: calc(92px + env(safe-area-inset-bottom)); }
 }
 @media (max-width: 1199px) {
   .sheet-handle {

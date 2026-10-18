@@ -1,6 +1,7 @@
 export type IconName =
   | "search"
   | "news"
+  | "robot"
   | "close"
   | "back"
   | "layers"
@@ -20,6 +21,7 @@ export type IconName =
 const paths: Record<IconName, string> = {
   search: "M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
   news: "M5 3h14v18H5zM8 7h8M8 11h8M8 15h3M14 15h2M8 18h8",
+  robot: "M12 3v3M10 3h4M5 7h14v13H5zM2 11v5M22 11v5M9 12h.01M15 12h.01M9 16h6",
   close: "M6 6l12 12M6 18L18 6",
   back: "M15 5l-7 7 7 7",
   layers: "M12 3l10 6-10 6L2 9zM2 13l10 6 10-6M2 17l10 6 10-6",
