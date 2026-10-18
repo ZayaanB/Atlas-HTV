@@ -1,0 +1,15 @@
+# Atlas auto-deploy — one run of infra/deploy.sh --auto (Person 4). Started by atlas-deploy.timer; see infra/README.md.
+# Install as /etc/systemd/system/atlas-deploy.service. Runs as root because it rebuilds the root-owned /opt/atlas checkout
+# and restarts atlas-backend. A run that only finds no new commit exits silently.
+[Unit]
+Description=Atlas auto-deploy from origin/main (build, restart, roll back on failure)
+Documentation=file:///opt/atlas/infra/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/atlas/infra/deploy.sh --auto
+# Builds share the small VM with the live backend; keep them in the background.
+Nice=10
+TimeoutStartSec=20min

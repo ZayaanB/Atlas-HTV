@@ -8,6 +8,7 @@ The configuration below is written and partly validated locally. **Nothing has b
 | --- | --- | --- |
 | `Caddyfile` | **Syntax.** `caddy validate` and `caddy fmt` pass (Caddy v2.10.2, official image). **Routing.** Run against the real backend with no credentials: `/api/health/live` returns 200 and `/api/health` returns 503 `not_ready`; data routes return the backend's structured 503; unknown `/api` routes return 404. SPA fallback serves `index.html`, `/evidence/*` serves PNG/JSON and hides `.md`, and a 783 KB body gets 413. **Headers.** All security headers are present. | Automatic HTTPS for a real domain (needs DNS); the CSP against Person 1's real build. |
 | `atlas-backend.service` | Written from Person 3's implemented start/stop behaviour. | Not run under systemd: there is no Linux VM yet. |
+| `deploy.sh` + `atlas-deploy.service` + `atlas-deploy.timer` | Written 2026-10-18. Pull/plan/rollback logic exercised locally against a throwaway Git repository with stubbed npm/systemctl/curl. | Not yet run on the VM. |
 | `atlas-ingest.service` + `atlas-ingest.timer` | Written 2026-10-18. The refresh pass that `node dist/ingest.js --all` runs was exercised locally through a harness (same ingestion code, non-TLS local pool) against a disposable database with real GDACS and USGS responses. | Not installed or run under systemd on the VM. Not enabled against Tiger until migration 006 is applied there. |
 | Accounts and credits | — | Vultr credits and their expiry, the GoDaddy Registry offer and domain eligibility, ongoing costs. **I have no access to these accounts.** A team member must check them before anything is provisioned. |
 
@@ -115,7 +116,7 @@ sudo tail -n 50 /var/log/caddy/atlas-access.log
 ```
 
 - **Restart on crash.** `Restart=on-failure` with `RestartSec=5`. Verify with `sudo systemctl kill -s SIGKILL atlas-backend`: it should be `active (running)` again with a new PID about 5 s later. More than 10 failures in 5 minutes stops the restarts; inspect the journal.
-- **Graceful restart after a deploy.** `git pull && npm --prefix backend ci && npm --prefix backend run build && sudo systemctl restart atlas-backend`. Requests in flight get up to 15 s.
+- **Graceful restart after a deploy.** Use `infra/deploy.sh` (next section). Requests in flight get up to 15 s.
 - **Configuration changes.** After `/etc/atlas/backend.env` changes, run `sudo systemctl restart atlas-backend`; environment files are not reloaded live.
 - **Caddy reload.** `sudo systemctl reload caddy`. The admin API listens on `127.0.0.1:2019` only.
 
@@ -128,6 +129,29 @@ sudo tail -n 50 /var/log/caddy/atlas-access.log
 | Ingestion | `api.gdeltproject.org`, `science.nasa.gov`, `www.gdacs.org`, `api.waterdata.usgs.gov` | Every 20 minutes once `atlas-ingest.timer` is enabled, or a manual `ingest` |
 | Flights | `api.adsb.lol` | Only after flights are enabled |
 | Certificates | Let's Encrypt / ZeroSSL ACME endpoints | Certificate issue and renewal |
+
+## Deploying updates
+
+`infra/deploy.sh` fast-forwards `/opt/atlas` to `origin/main` and rebuilds only what changed: contracts (which also rebuilds the backend and frontend), backend, and frontend. The frontend builds into `dist.next` and is swapped in, so Caddy never serves a half-built site. The backend restarts only for changes it loads at runtime, never for frontend, evidence, or docs-only changes. The new release must pass `/api/health` within 60 s, or only `/api/health/live` if the old one was not ready either. If a build or that check fails, the script resets to the previous commit, rebuilds, restarts, and records the failed commit.
+
+```bash
+sudo bash /opt/atlas/infra/deploy.sh                     # deploy now (waits for a running ingestion pass)
+sudo bash /opt/atlas/infra/deploy.sh --force             # rebuild everything even when up to date
+sudo bash /opt/atlas/infra/deploy.sh --allow-migrations  # after applying new db/migrations on Tiger
+```
+
+It refuses to run if tracked files in `/opt/atlas` have local edits or `main` was rewritten, and it stops on db/migrations changes until `--allow-migrations` is given. It does not change `/etc/atlas`, `/var/lib/atlas` (the flight ledger), the database, or the installed systemd and Caddy files. If an update changes `infra/*.service`, `*.timer`, or the `Caddyfile`, it logs a note so you can install them by hand.
+
+**Automatic deploys (optional).** `atlas-deploy.timer` runs `deploy.sh --auto` every 5 minutes. When nothing is new, a run is one `git fetch` and no output. Auto mode never waits: it skips a run while ingestion is active and doesn't retry a commit that was rolled back. Updates touching db/migrations are held, and that run is marked failed in `systemctl status atlas-deploy`. A later manual deploy clears both.
+
+```bash
+sudo cp /opt/atlas/infra/atlas-deploy.service /opt/atlas/infra/atlas-deploy.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now atlas-deploy.timer
+journalctl -u atlas-deploy -n 50 --no-pager      # what each deploy did
+sudo systemctl disable --now atlas-deploy.timer  # back to manual deploys
+```
+
+Each backend restart clears the in-memory flight snapshot, so the next viewer can spend one AirLabs attempt. Frequent merges to `main` therefore cost flight quota while flights are enabled.
 
 ## Scheduled ingestion (after migration 006 is on Tiger)
 
