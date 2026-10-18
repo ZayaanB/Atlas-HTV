@@ -5,6 +5,9 @@ import { SourceCards } from "./SourceCards";
 import { Timeline } from "./Timeline";
 import { dateTime, words } from "../../lib/presentation";
 import { localEvidenceAsset } from "../../lib/evidence-assets";
+import {useWorkspace} from '../../app/state';
+import {audienceProfiles} from '../../app/audience';
+import {AudienceSelect} from '../../components/AudienceSelect';
 export type EvidenceOverlay = {
   evidence: Evidence;
   url: string;
@@ -28,12 +31,12 @@ export function InvestigationPanel({
   onFocus: (bounds: NonNullable<Evidence["imagery"]>["bounds"]) => void;
 }) {
   const [tab, setTab] = useState("brief"),
-    [audience, setAudience] = useState("general_public"),
     [sourceFocus, setSourceFocus] = useState<string | null>(null),
     [imageId, setImageId] = useState(""),
     [visible, setVisible] = useState(false),
     [opacity, setOpacity] = useState(0.85),
     [imageError, setImageError] = useState(false);
+  const audience = useWorkspace(state => state.audience);
   const inv = data.investigation,
     imagery = data.evidence.filter((e) => e.type === "imagery"),
     image = imagery.find((e) => e.id === imageId) ?? imagery[0],
@@ -96,49 +99,13 @@ export function InvestigationPanel({
       </nav>
       {tab === "brief" && (
         <>
-          <label>
-            Perspective
-            <select
-              value={audience}
-              onChange={(e) => setAudience(e.target.value)}
-            >
-              <option value="general_public">General public</option>
-              <option value="journalist">Journalist</option>
-              <option value="investor">Investor</option>
-            </select>
-          </label>
+          <AudienceSelect label="Perspective" />
           <p className="muted">
             Perspective changes the reading order. All supplied facts and source
             links remain available.
           </p>
           <p className="investigation-summary">{inv.summary}</p>
-          {(audience === "journalist"
-            ? [
-                "research_question",
-                "what_happened",
-                "public_impact",
-                "uncertainty",
-                "resource",
-                "business_exposure",
-              ]
-            : audience === "investor"
-              ? [
-                  "business_exposure",
-                  "public_impact",
-                  "what_happened",
-                  "uncertainty",
-                  "research_question",
-                  "resource",
-                ]
-              : [
-                  "what_happened",
-                  "public_impact",
-                  "resource",
-                  "uncertainty",
-                  "research_question",
-                  "business_exposure",
-                ]
-          ).map((kind) => (
+          {audienceProfiles[audience].sections.map((kind) => (
             <section className="brief-section" key={kind}>
               <h3>{words(kind)}</h3>
               {inv.items.filter((item) => item.kind === kind).length ? (

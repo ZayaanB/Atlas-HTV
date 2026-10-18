@@ -29,6 +29,8 @@ import {
 } from "../features/research/InvestigationPanel";
 import { Icon } from "../components/Icon";
 import { Panel } from "../components/Panel";
+import {AudienceOnboarding} from '../components/AudienceOnboarding';
+import {AudienceSelect} from '../components/AudienceSelect';
 import { dateTime, publication, words } from "../lib/presentation";
 import { useWorkspace, type PanelView } from "./state";
 import type { AtlasMapProps, MapSelection } from "./map-interface";
@@ -202,6 +204,7 @@ export function App({
   }, [panelOpen, state.sheetExpanded]);
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
+      if (!state.onboardingComplete) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         state.openPanel({ view: "search" }, true);
@@ -223,7 +226,7 @@ export function App({
       document.removeEventListener("keydown", keys, true);
       document.removeEventListener("pointerdown", outside);
     };
-  }, [layers, state.openPanel]);
+  }, [layers, state.openPanel, state.onboardingComplete]);
   function select(next: MapSelection) {
     const article = next.articleId
       ? articles.find((a) => a.id === next.articleId)
@@ -297,8 +300,9 @@ export function App({
     catalog.data?.investigations.filter(
       (inv) => selected && inv.article_ids.includes(selected.id),
     ) ?? [];
-  return (
+  return (<>
     <main
+      inert={!state.onboardingComplete}
       className={`atlas-workspace ${panel ? "has-panel" : ""}`}
       aria-label="Atlas geographic news workspace"
     >
@@ -345,6 +349,8 @@ export function App({
         </div>
         <header className="identity">
           <span className="brand">ATLAS</span>
+          <AudienceSelect />
+          {!state.audienceStorageAvailable && <span role="status" className="audience-storage-note">Preference kept for this visit only.</span>}
           <button
             className={`coverage-badge ${api.mode === "fixture" ? "historical" : ""}`}
             onClick={() => state.openPanel({ view: "coverage" })}
@@ -1000,5 +1006,7 @@ export function App({
         )}
       </Panel>
     </main>
+    {!state.onboardingComplete && <AudienceOnboarding />}
+  </>
   );
 }

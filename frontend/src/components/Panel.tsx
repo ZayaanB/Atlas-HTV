@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./Icon";
+import {AudienceSelect} from './AudienceSelect';
 import { useWorkspace } from "../app/state";
 
 export function Panel({
@@ -174,6 +175,7 @@ export function Panel({
           </button>
         </div>
       </header>
+      {modal && <div className="panel-audience"><AudienceSelect /></div>}
       <div className="panel-body" ref={body}>
         {children}
       </div>

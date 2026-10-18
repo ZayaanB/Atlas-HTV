@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type {
   Article,
   AssistantResponse,
-  AssistantRequest,
   InvestigationResponse,
   NewsQuery,
   Location,
@@ -13,6 +12,8 @@ import { readContract } from "../../lib/validation";
 import { useWorkspace } from "../../app/state";
 import { Icon } from "../../components/Icon";
 import { ResearchCoverage } from "../research/ResearchCoverage";
+import {assistantAudience, audienceProfiles} from '../../app/audience';
+import {AudienceSelect} from '../../components/AudienceSelect';
 interface Message {
   role: "user" | "assistant";
   text: string;
@@ -32,8 +33,6 @@ export function AssistantPanel({
   const [messages, setMessages] = useState<Message[]>([]),
     [draft, setDraft] = useState(""),
     [allow, setAllow] = useState(false),
-    [audience, setAudience] =
-      useState<NonNullable<AssistantRequest["audience"]>>("general_public"),
     [pending, setPending] = useState(false),
     [error, setError] = useState(""),
     [undo, setUndo] = useState<NewsQuery | null>(null),
@@ -42,6 +41,7 @@ export function AssistantPanel({
     requestId = useRef<string | null>(null),
     revision = useWorkspace((s) => s.contextRevision),
     selection = useWorkspace((s) => s.selection),
+    audience = useWorkspace((s) => s.audience),
     filters = useWorkspace((s) => s.filters);
   useEffect(() => {
     if (initialPrompt) setDraft(initialPrompt);
@@ -50,7 +50,7 @@ export function AssistantPanel({
     controller.current?.abort();
     requestId.current = null;
     setPending(false);
-  }, [revision]);
+  }, [revision, audience]);
   useEffect(() => () => controller.current?.abort(), []);
   async function submit(message = draft) {
     if (!message.trim() || !api.assistant || pending) return;
@@ -93,7 +93,7 @@ export function AssistantPanel({
             ...(investigation
               ? { selected_investigation_id: investigation.investigation.id }
               : {}),
-            audience,
+            audience: assistantAudience(audience),
           }),
           abort.signal,
         ),
@@ -101,7 +101,8 @@ export function AssistantPanel({
       const current = () =>
         !abort.signal.aborted &&
         requestId.current === id &&
-        useWorkspace.getState().contextRevision === context;
+        useWorkspace.getState().contextRevision === context &&
+        useWorkspace.getState().audience === audience;
       if (!current()) return;
       if (response.request_id !== id)
         throw new Error(
@@ -201,6 +202,11 @@ export function AssistantPanel({
       }
     }
   }
+  const suggestions = audienceProfiles[audience].questions.map(prompt => (
+    <button key={prompt} className="suggestion" onClick={() => setDraft(prompt)}>
+      {prompt}<Icon name="arrow" size={15} />
+    </button>
+  ));
   return (
     <section aria-label="Ask Atlas">
       <p className="muted assistant-context">
@@ -229,20 +235,7 @@ export function AssistantPanel({
               Ask what the sources establish, what changed, or what remains
               uncertain.
             </p>
-            {[
-              "What is confirmed by these sources?",
-              "What evidence is missing?",
-              "What should a journalist investigate next?",
-            ].map((prompt) => (
-              <button
-                key={prompt}
-                className="suggestion"
-                onClick={() => setDraft(prompt)}
-              >
-                {prompt}
-                <Icon name="arrow" size={15} />
-              </button>
-            ))}
+            {suggestions}
           </div>
         ) : (
           messages.map((message, i) => (
@@ -276,6 +269,7 @@ export function AssistantPanel({
           ))
         )}
       </div>
+      {messages.length > 0 && <details className="audience-suggestions"><summary>Suggested questions</summary>{suggestions}</details>}
       {status && (
         <p role="status" className="notice">
           {status}
@@ -334,22 +328,7 @@ export function AssistantPanel({
             />
             Allow map and filter updates
           </label>
-          <label>
-            Perspective
-            <select
-              value={audience}
-              onChange={(e) => {
-                controller.current?.abort();
-                requestId.current = null;
-                setPending(false);
-                setAudience(e.target.value as typeof audience);
-              }}
-            >
-              <option value="general_public">General public</option>
-              <option value="journalist">Journalist</option>
-              <option value="investor">Investor</option>
-            </select>
-          </label>
+          <AudienceSelect label="Perspective" />
         </div>
         <p className="muted">
           Perspective changes explanation emphasis. Facts and active filters
